@@ -1,0 +1,4 @@
+CREATE TABLE sessions (
+	id VARCHAR(32) PRIMARY KEY NOT NULL,
+	logged_in_user_id INTEGER DEFAULT NULL REFERENCES users (id)
+);
