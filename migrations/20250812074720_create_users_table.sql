@@ -1,0 +1,7 @@
+CREATE TABLE users (
+	id SERIAL PRIMARY KEY,
+	email VARCHAR(64) UNIQUE NOT NULL,
+	full_name VARCHAR(32) NOT NULL,
+	ms_token VARCHAR(64) NOT NULL,
+	role_id INTEGER NOT NULL REFERENCES roles (id)
+);

@@ -1,28 +1,24 @@
 @extends("layout.rs.html")
+@use "components/Button.rs.html" as AppButton
 
 <div class="w-full h-full flex-grow flex flex-col justify-center items-center gap-4 p-3 group relative">
 	<h2 class="text-3xl font-bold">[DEBUG] Choose user type</h2>
 
-	<div class="w-full max-w-xl px-4 py-3 flex flex-col gap-4">
-		<form method="POST" action="/showcase/login">
-			<input type="hidden" name="user_type" value="team_agent" />
-			<button class="bg-blue-800 w-full rounded-xl px-8 py-3 flex flex-row gap-2 justify-center items-center cursor-pointer" type="submit">
-				Zaloguj jako agent
-			</button>
-		</form>
-
-		<form method="POST" action="/showcase/login">
-			<input type="hidden" name="user_type" value="team_management" />
-			<button class="bg-neutral-950 border-3 border-blue-800 w-full rounded-xl px-8 py-3 flex flex-row gap-2 justify-center items-center cursor-pointer" type="submit">
-				Zaloguj jako management
-			</button>
-		</form>
-
-		<form method="POST" action="/showcase/login">
-			<input type="hidden" name="user_type" value="team_other" />
-			<button  class="bg-neutral-950 border-3 border-blue-800 w-full rounded-xl px-8 py-3 flex flex-row gap-2 justify-center items-center cursor-pointer" type="submit">
-				Zaloguj jako pracownik innego działu
-			</button>
-		</form>
+	<div class="w-full max-w-3xl px-4 py-3 flex flex-col gap-4">
+		<table class="w-full border-collapse">
+			<tbody>
+				@for user in &self.users {
+					<tr class="whitespace-nowrap hover:bg-neutral-900">
+						<td class="px-4 py-3 border-t border-neutral-800 w-full">@user.full_name<br /><span class="text-sm text-neutral-400">@user.email</span></td>
+						<td class="px-4 py-3 border-t border-neutral-800">
+							<form method="POST">
+								<input type="hidden" name="user_id" value=@user.id />
+								<AppButton is_primary=true additional_arguments={}>Zaloguj</AppButton>
+							</form>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
 	</div>
 </div>
