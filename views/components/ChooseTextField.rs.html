@@ -1,0 +1,13 @@
+@use "components/TextField.rs.html"
+
+<div class="w-full relative">
+	<TextField id=@id name=@name additional_classes={} disable_autocomplete=true additional_input_classes={}>
+		@child_content
+	</TextField>
+
+	<div class="absolute top-[100%] left-0 flex flex-col">
+		<div class="">
+
+		</div>
+	</div>
+</div>

@@ -1,12 +1,19 @@
+use crate::uow::{UnitOfWork, UserEntity};
 use axum::routing::get;
 use axum_cookie::CookieLayer;
 use clap::Parser;
-use rshtml::RsHtml;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres, Transaction};
+use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
 
 mod middlewares;
+mod templating;
+mod uow;
+
+#[cfg(debug_assertions)]
+const IS_BUILD_DEBUG: bool = true;
+#[cfg(not(debug_assertions))]
+const IS_BUILD_DEBUG: bool = false;
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "assets/"]
@@ -30,23 +37,7 @@ struct Args {
     db_database: String,
 }
 
-#[tokio::main]
-async fn main() {
-    let args = Args::parse();
-
-    let db_pool = PgPoolOptions::new()
-        .connect(&format!(
-            "postgresql://{}:{}@{}:{}/{}",
-            args.db_username, args.db_password, args.db_host, args.db_port, args.db_database
-        ))
-        .await
-        .expect("failed to connect to database");
-
-    sqlx::migrate!()
-        .run(&db_pool)
-        .await
-        .expect("failed to migrate database");
-
+async fn seed(db_pool: &Pool<Postgres>) {
     let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
 
     let users_to_seed = vec![
@@ -87,20 +78,6 @@ async fn main() {
         },
     ];
 
-    if !uow
-        .does_user_with_given_email_exists("domanski.bartlomiej@confilogi.com")
-        .await
-        .unwrap()
-    {
-        uow.create_user(
-            "domanski.bartlomiej@confilogi.com",
-            "Bartłomiej Domański",
-            "somemstoken1",
-            2,
-        )
-        .await
-        .unwrap();
-    }
     for user in users_to_seed.iter() {
         if !uow
             .does_user_with_given_email_exists(&user.email)
@@ -114,6 +91,28 @@ async fn main() {
     }
 
     uow.commit().await.unwrap();
+}
+
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
+
+    let db_pool = PgPoolOptions::new()
+        .connect(&format!(
+            "postgresql://{}:{}@{}:{}/{}",
+            args.db_username, args.db_password, args.db_host, args.db_port, args.db_database
+        ))
+        .await
+        .expect("failed to connect to database");
+
+    sqlx::migrate!()
+        .run(&db_pool)
+        .await
+        .expect("failed to migrate database");
+
+    if IS_BUILD_DEBUG {
+        seed(&db_pool).await;
+    }
 
     println!("Database seeded successfully.");
 
@@ -124,6 +123,7 @@ async fn main() {
             get(handlers::showcase_login_page).post(handlers::showcase_login),
         )
         .route("/report", get(handlers::report_problem_page))
+        .route("/report/onboarding", get(handlers::report_onboarding_page))
         .layer(axum::middleware::from_fn_with_state(
             db_pool.clone(),
             handlers::session_middleware,
@@ -142,7 +142,7 @@ async fn main() {
 }
 
 mod handlers {
-    use std::borrow::Cow;
+    use std::{borrow::Cow, collections::HashMap};
 
     use axum::{
         Extension, Form, Json,
@@ -153,12 +153,17 @@ mod handlers {
         response::{Html, IntoResponse, Response},
     };
     use axum_cookie::{CookieManager, cookie::Cookie};
+    use rand::distr::slice::Choose;
     use rshtml::traits::RsHtml;
     use sqlx::{Pool, Postgres};
 
     use crate::{
-        Assets, LoginPage, ReportProblemPage, SessionEntity, ShowcaseLoginPage, TemplateState,
-        UnitOfWork, UserEntity,
+        Assets, UnitOfWork, UserEntity,
+        templating::{
+            ChooseTextFieldItem, LoginPage, ReportOnboardingPage, ReportProblemPage,
+            ShowcaseLoginPage, TemplateState,
+        },
+        uow::SessionEntity,
     };
 
     pub async fn login_page(
@@ -329,6 +334,10 @@ mod handlers {
         State(state): State<Pool<Postgres>>,
         Extension(session): Extension<SessionEntity>,
     ) -> Result<Response, Response> {
+        if session.is_logged_in() {
+            return Ok((StatusCode::FORBIDDEN, "403 Forbidden").into_response());
+        }
+
         Ok((
             StatusCode::OK,
             Html(
@@ -341,219 +350,59 @@ mod handlers {
         )
             .into_response())
     }
-}
 
-struct TemplateState {
-    logged_in_user: Option<UserEntity>,
-}
+    pub async fn report_onboarding_page(
+        State(state): State<Pool<Postgres>>,
+        Extension(session): Extension<SessionEntity>,
+    ) -> Result<Response, Response> {
+        let mut uow = UnitOfWork::new(&state).await.unwrap();
 
-impl TemplateState {
-    pub async fn fetch(db_pool: &Pool<Postgres>, session_entity: SessionEntity) -> Self {
-        let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+        let company_departments = uow.get_company_departments().await.unwrap();
+        let job_titles_with_company_departments = uow.get_job_titles().await.unwrap();
 
-        let logged_in_user = match session_entity.logged_in_user_id {
-            Some(user_id) => Some(
-                uow.find_user_by_id(user_id)
-                    .await
-                    .unwrap()
-                    .expect("user inside session to exist"),
+        let possible_company_departments = company_departments
+            .into_iter()
+            .map(|company_department| ChooseTextFieldItem {
+                value: company_department.id,
+                display_text: company_department.name,
+            })
+            .collect();
+
+        let mut possible_job_titles_for_company_departments: HashMap<
+            i32,
+            Vec<ChooseTextFieldItem<i32>>,
+        > = HashMap::new();
+
+        job_titles_with_company_departments
+            .into_iter()
+            .for_each(|job_title| {
+                let mut job_titles = possible_job_titles_for_company_departments
+                    .remove(&job_title.company_department_id)
+                    .unwrap_or_default();
+
+                job_titles.push(ChooseTextFieldItem {
+                    display_text: job_title.name,
+                    value: job_title.id,
+                });
+
+                possible_job_titles_for_company_departments
+                    .insert(job_title.company_department_id, job_titles);
+            });
+
+        uow.commit().await.unwrap();
+
+        Ok((
+            StatusCode::OK,
+            Html(
+                ReportOnboardingPage {
+                    state: TemplateState::fetch(&state, session).await,
+                    possible_company_departments,
+                    possible_job_titles_for_company_departments,
+                }
+                .render()
+                .unwrap(),
             ),
-            None => None,
-        };
-
-        Self { logged_in_user }
-    }
-
-    pub fn is_logged_in(&self) -> bool {
-        self.logged_in_user.is_some()
-    }
-}
-
-struct TemplateRenderer {
-    state: TemplateState,
-}
-
-#[derive(RsHtml)]
-struct LoginPage {
-    state: TemplateState,
-    username: String,
-}
-
-#[derive(RsHtml)]
-struct ShowcaseLoginPage {
-    state: TemplateState,
-    users: Vec<UserEntity>,
-}
-
-#[derive(RsHtml)]
-struct ReportProblemPage {
-    state: TemplateState,
-}
-
-struct UnitOfWork<'a> {
-    transaction: Transaction<'a, sqlx::Postgres>,
-}
-
-impl<'a> UnitOfWork<'a> {
-    pub async fn new(pool: &Pool<Postgres>) -> Result<Self, sqlx::Error> {
-        Ok(Self {
-            transaction: pool.begin().await?,
-        })
-    }
-
-    pub async fn commit(self) -> Result<(), sqlx::Error> {
-        self.transaction.commit().await
-    }
-
-    pub async fn does_user_with_given_email_exists(
-        &mut self,
-        email: impl Into<String>,
-    ) -> Result<bool, sqlx::Error> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = $1")
-            .bind(email.into())
-            .fetch_one(&mut *self.transaction)
-            .await?;
-
-        return Ok(count == 1);
-    }
-
-    pub async fn does_user_with_given_id_exists(
-        &mut self,
-        user_id: i64,
-    ) -> Result<bool, sqlx::Error> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_one(&mut *self.transaction)
-            .await?;
-
-        return Ok(count == 1);
-    }
-
-    pub async fn create_user(
-        &mut self,
-        email: impl Into<String>,
-        full_name: impl Into<String>,
-        ms_token: impl Into<String>,
-        role_id: i32,
-    ) -> Result<i32, sqlx::Error> {
-        sqlx::query_scalar(
-            "INSERT INTO users (email, full_name, ms_token, role_id) VALUES ($1, $2, $3, $4) RETURNING id;",
         )
-        .bind(email.into())
-        .bind(full_name.into())
-        .bind(ms_token.into())
-        .bind(role_id)
-        .fetch_one(&mut *self.transaction)
-        .await
+            .into_response())
     }
-
-    pub async fn delete_user_by_id(&mut self, id: i32) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM users WHERE id = $1")
-            .bind(id)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn create_session(&mut self) -> Result<String, sqlx::Error> {
-        let mut token = String::new();
-        const ALPHABET: &str = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890";
-
-        for _ in 0..32 {
-            token.push(
-                ALPHABET
-                    .chars()
-                    .nth(rand::random::<u32>() as usize % ALPHABET.len())
-                    .unwrap(),
-            );
-        }
-
-        sqlx::query("INSERT INTO sessions (id) VALUES ($1);")
-            .bind(&token)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(token)
-    }
-
-    pub async fn find_session_by_id(
-        &mut self,
-        session_id: &str,
-    ) -> Result<Option<SessionEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM sessions WHERE id = $1")
-            .bind(session_id)
-            .fetch_optional(&mut *self.transaction)
-            .await
-    }
-
-    pub async fn change_logged_in_user_id_inside_session(
-        &mut self,
-        session_id: &str,
-        new_user_id: Option<i32>,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE sessions SET logged_in_user_id = $1 WHERE id = $2")
-            .bind(new_user_id)
-            .bind(session_id)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn delete_session_by_id(&mut self, session_id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM sessions WHERE id = $1")
-            .bind(session_id)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn find_user_by_id(
-        &mut self,
-        user_id: i32,
-    ) -> Result<Option<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users WHERE id = $1;")
-            .bind(user_id)
-            .fetch_optional(&mut *self.transaction)
-            .await
-    }
-
-    pub async fn find_user_by_role_id(
-        &mut self,
-        role_id: i32,
-    ) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users WHERE role_id = $1;")
-            .bind(role_id)
-            .fetch_all(&mut *self.transaction)
-            .await
-    }
-
-    pub async fn get_users(&mut self) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users")
-            .fetch_all(&mut *self.transaction)
-            .await
-    }
-}
-
-#[derive(sqlx::FromRow, Clone, Debug, Default)]
-struct SessionEntity {
-    id: String,
-    pub logged_in_user_id: Option<i32>,
-}
-
-impl SessionEntity {
-    pub fn is_logged_in(&self) -> bool {
-        self.logged_in_user_id.is_some()
-    }
-}
-
-#[derive(sqlx::FromRow, Clone, Debug, Default)]
-struct UserEntity {
-    id: i32,
-    email: String,
-    full_name: String,
-    ms_token: String,
-    role_id: i32,
 }

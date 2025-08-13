@@ -1,9 +1,10 @@
 @use "components/ConfilogiIcon.rs.html"
+@use "components/MenuIcon.rs.html"
 
-<header class="w-full flex flex-row border-b border-b-neutral-800">
-	<ConfilogiIcon additional_properties={ class="w-30 mx-4" } />
+<header class="relative w-full flex flex-row justify-between items-center border-b border-b-neutral-800">
+	<ConfilogiIcon additional_properties={ class="w-30 mx-4 py-2" } />
 
-	<div class="w-full flex flex-row justify-end">
+	<div class="w-full hidden md:flex flex-row justify-end">
 		@if self.state.is_logged_in() {
 			<a href="/report" class="px-4 py-4 hover:bg-neutral-800">
 				Zgłoś problem
@@ -29,4 +30,34 @@
 			</a>
 		}
 	</div>
+
+	<div class="absolute w-screen md:!hidden hidden [&.is-active]:flex flex-col h-full top-[100%] left-0 z-30 bg-neutral-950" id="header-navbar-mobile-items">
+		@if self.state.is_logged_in() {
+			<a href="/report" class="px-4 py-3 bg-neutral-950 hover:bg-neutral-800 border-t border-b border-neutral-800">
+				Zgłoś problem
+			</a>
+
+			<a href="/reported-problems" class="px-4 py-3 bg-neutral-950 hover:bg-neutral-800 border-b border-b-neutral-800">
+				Moje zgłoszenia
+			</a>
+
+			<a href="/logout" class="px-4 py-3 bg-neutral-950 hover:bg-neutral-800 border-b border-b-neutral-800">
+				Wyloguj
+			</a>
+		} else {
+			<a href="/" class="px-4 py-3 bg-neutral-950 hover:bg-neutral-800 border-b border-b-neutral-800">
+				Zaloguj
+			</a>
+		}
+	</div>
+
+	<button class="flex justify-center items-center px-4 py-3 cursor-pointer md:hidden" onclick="switchMobileItems()" type="button">
+		<MenuIcon additional_properties={ class="text-neutral-200 w-8 aspect-square" } />
+	</button>
 </header>
+
+<script>
+const switchMobileItems = () => document.querySelector("#header-navbar-mobile-items")
+	.classList
+	.toggle("is-active");
+</script>

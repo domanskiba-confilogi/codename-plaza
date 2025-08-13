@@ -7,7 +7,7 @@ use axum::{
 };
 use sqlx::{Pool, Postgres};
 
-use crate::{SessionEntity, UnitOfWork};
+use crate::{UnitOfWork, uow::SessionEntity};
 
 pub async fn must_be_logged_in(
     State(state): State<Pool<Postgres>>,

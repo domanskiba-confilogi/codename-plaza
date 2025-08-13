@@ -1,0 +1,21 @@
+@extends("layout.rs.html")
+
+@use "components/TextField.rs.html"
+@use "components/ChooseTextField.rs.html"
+
+<div class="w-full p-4 flex flex-col gap-4">
+	<h2 class="text-3xl font-bold text-center">Zgłoś onboarding</h2>
+	
+	<div class="flex flex-col gap-4 sm:flex-row flex-nowrap">
+		<TextField id="name" name="name" disable_autocomplete=true additional_classes="" additional_input_classes={}>
+			Imię
+		</TextField>
+		<TextField id="surname" name="surname" disable_autocomplete=true additional_classes={} additional_input_classes={}>
+			Nazwisko
+		</TextField>
+	</div>
+
+	<ChooseTextField id="job_title" name="job_title" items=@&self.possible_company_departments>Dział</ChooseTextField>
+
+	@#json(&self.possible_job_titles_for_company_departments)
+</div>

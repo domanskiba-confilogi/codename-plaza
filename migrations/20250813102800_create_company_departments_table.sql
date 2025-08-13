@@ -1,0 +1,4 @@
+CREATE TABLE company_departments (
+	id SERIAL PRIMARY KEY,
+	name VARCHAR(32) NOT NULL UNIQUE
+);
