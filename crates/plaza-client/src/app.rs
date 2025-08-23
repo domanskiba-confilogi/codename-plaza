@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 use crate::icons::ConfilogiIcon;
-use crate::pages::{*};
+use crate::pages::*;
 use crate::icons::MenuIcon;
 
 pub struct App {
@@ -117,6 +117,9 @@ pub enum Route {
     #[at("/report-problem")]
     ReportProblem,
 
+    #[at("/report-problem/onboarding")]
+    ReportOnboarding,
+
     #[at("/my-tickets")]
     MyTickets,
 
@@ -135,6 +138,9 @@ fn switch_routes(route: Route) -> Html {
         }
         Route::ReportProblem => {
             html! { <ReportProblem /> }
+        }
+        Route::ReportOnboarding => {
+            html! { <ReportOnboarding /> }
         }
         Route::MyTickets => {
             html! { <MyTickets /> }

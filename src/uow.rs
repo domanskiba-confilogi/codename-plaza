@@ -19,54 +19,51 @@ impl<'a> UnitOfWork<'a> {
         &mut self,
         email: impl Into<String>,
     ) -> Result<bool, sqlx::Error> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email = $1")
-            .bind(email.into())
+        let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE email = $1", email.into())
             .fetch_one(&mut *self.transaction)
             .await?;
 
-        return Ok(count == 1);
+        return Ok(count == Some(1));
     }
 
     pub async fn does_user_with_given_id_exists(
         &mut self,
-        user_id: i64,
+        user_id: i32,
     ) -> Result<bool, sqlx::Error> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = $1")
-            .bind(user_id)
+        let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE id = $1", user_id)
             .fetch_one(&mut *self.transaction)
             .await?;
 
-        return Ok(count == 1);
+        return Ok(count == Some(1));
     }
 
     pub async fn create_user(
         &mut self,
         email: impl Into<String>,
         full_name: impl Into<String>,
-        ms_token: impl Into<String>,
+        hashed_password: impl Into<String>,
         role_id: i32,
     ) -> Result<i32, sqlx::Error> {
-        sqlx::query_scalar(
-            "INSERT INTO users (email, full_name, ms_token, role_id) VALUES ($1, $2, $3, $4) RETURNING id;",
+        sqlx::query_scalar!(
+            "INSERT INTO users (email, full_name, password, role_id) VALUES ($1, $2, $3, $4) RETURNING id;",
+            email.into(),
+            full_name.into(),
+            hashed_password.into(),
+            role_id
         )
-        .bind(email.into())
-        .bind(full_name.into())
-        .bind(ms_token.into())
-        .bind(role_id)
         .fetch_one(&mut *self.transaction)
         .await
     }
 
     pub async fn delete_user_by_id(&mut self, id: i32) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM users WHERE id = $1")
-            .bind(id)
+        sqlx::query!("DELETE FROM users WHERE id = $1", id)
             .execute(&mut *self.transaction)
             .await?;
 
         Ok(())
     }
 
-    pub async fn create_session(&mut self) -> Result<String, sqlx::Error> {
+    pub async fn create_authorization_token(&mut self, user_id: i32) -> Result<String, sqlx::Error> {
         let mut token = String::new();
         const ALPHABET: &str = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890";
 
@@ -79,53 +76,38 @@ impl<'a> UnitOfWork<'a> {
             );
         }
 
-        sqlx::query("INSERT INTO sessions (id) VALUES ($1);")
-            .bind(&token)
+        sqlx::query!("INSERT INTO authorization_tokens (token, user_id) VALUES ($1, $2);", &token, user_id)
             .execute(&mut *self.transaction)
             .await?;
 
         Ok(token)
     }
 
-    pub async fn find_session_by_id(
+    pub async fn find_user_by_authorization_token(
         &mut self,
-        session_id: &str,
-    ) -> Result<Option<SessionEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM sessions WHERE id = $1")
-            .bind(session_id)
-            .fetch_optional(&mut *self.transaction)
-            .await
-    }
-
-    pub async fn change_logged_in_user_id_inside_session(
-        &mut self,
-        session_id: &str,
-        new_user_id: Option<i32>,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE sessions SET logged_in_user_id = $1 WHERE id = $2")
-            .bind(new_user_id)
-            .bind(session_id)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn delete_session_by_id(&mut self, session_id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("DELETE FROM sessions WHERE id = $1")
-            .bind(session_id)
-            .execute(&mut *self.transaction)
-            .await?;
-
-        Ok(())
+        authentication_token: &str
+    ) -> Result<Option<UserEntity>, sqlx::Error> {
+        sqlx::query_as!(
+            UserEntity, 
+            "SELECT * FROM users WHERE id = (SELECT user_id FROM authorization_tokens WHERE token = $1)",
+            authentication_token
+        ).fetch_optional(&mut *self.transaction).await
     }
 
     pub async fn find_user_by_id(
         &mut self,
         user_id: i32,
     ) -> Result<Option<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users WHERE id = $1;")
-            .bind(user_id)
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE id = $1;", user_id)
+            .fetch_optional(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn find_user_by_email(
+        &mut self,
+        email: impl Into<String>,
+    ) -> Result<Option<UserEntity>, sqlx::Error> {
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE email = $1;", email.into())
             .fetch_optional(&mut *self.transaction)
             .await
     }
@@ -134,14 +116,13 @@ impl<'a> UnitOfWork<'a> {
         &mut self,
         role_id: i32,
     ) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users WHERE role_id = $1;")
-            .bind(role_id)
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE role_id = $1;", role_id)
             .fetch_all(&mut *self.transaction)
             .await
     }
 
     pub async fn get_users(&mut self) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM users")
+        sqlx::query_as!(UserEntity, "SELECT * FROM users")
             .fetch_all(&mut *self.transaction)
             .await
     }
@@ -149,7 +130,7 @@ impl<'a> UnitOfWork<'a> {
     pub async fn get_company_departments(
         &mut self,
     ) -> Result<Vec<CompanyDepartmentEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM company_departments")
+        sqlx::query_as!(CompanyDepartmentEntity, "SELECT * FROM company_departments")
             .fetch_all(&mut *self.transaction)
             .await
     }
@@ -158,14 +139,13 @@ impl<'a> UnitOfWork<'a> {
         &mut self,
         company_department_id: i32,
     ) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM job_titles WHERE company_department_id = $1")
-            .bind(company_department_id)
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE company_department_id = $1", company_department_id)
             .fetch_all(&mut *self.transaction)
             .await
     }
 
     pub async fn get_job_titles(&mut self) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM job_titles")
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles")
             .fetch_all(&mut *self.transaction)
             .await
     }
@@ -185,22 +165,10 @@ pub struct CompanyDepartmentEntity {
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
-pub struct SessionEntity {
-    pub id: String,
-    pub logged_in_user_id: Option<i32>,
-}
-
-impl SessionEntity {
-    pub fn is_logged_in(&self) -> bool {
-        self.logged_in_user_id.is_some()
-    }
-}
-
-#[derive(sqlx::FromRow, Clone, Debug, Default)]
 pub struct UserEntity {
     pub id: i32,
     pub email: String,
+    pub password: String,
     pub full_name: String,
-    pub ms_token: String,
     pub role_id: i32,
 }

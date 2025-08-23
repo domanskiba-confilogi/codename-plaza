@@ -1,5 +1,5 @@
 use crate::uow::{UnitOfWork, UserEntity};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum_cookie::CookieLayer;
 use clap::Parser;
 use sqlx::postgres::PgPoolOptions;
@@ -7,7 +7,6 @@ use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
 
 mod middlewares;
-mod templating;
 mod uow;
 mod handlers;
 
@@ -15,10 +14,6 @@ mod handlers;
 const IS_BUILD_DEBUG: bool = true;
 #[cfg(not(debug_assertions))]
 const IS_BUILD_DEBUG: bool = false;
-
-#[derive(rust_embed::RustEmbed)]
-#[folder = "assets/"]
-struct Assets;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -45,36 +40,36 @@ async fn seed(db_pool: &Pool<Postgres>) {
         UserEntity {
             id: 0,
             email: "domanski.bartlomiej@confilogi.com".into(),
+            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
             full_name: "Bartłomiej Domański".into(),
-            ms_token: "ms_token_1".into(),
             role_id: 2,
         },
         UserEntity {
             id: 0,
             email: "oleksa.jacek@confilogi.com".into(),
+            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
             full_name: "Jacek Oleksa".into(),
-            ms_token: "ms_token_2".into(),
             role_id: 1,
         },
         UserEntity {
             id: 0,
             email: "problem.tomasz@confilogi.com".into(),
+            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
             full_name: "Tomasz Problem".into(),
-            ms_token: "ms_token_3".into(),
             role_id: 5,
         },
         UserEntity {
             id: 0,
             email: "problem.mateusz@confilogi.com".into(),
+            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
             full_name: "Mateusz Problem".into(),
-            ms_token: "ms_token_4".into(),
             role_id: 4,
         },
         UserEntity {
             id: 0,
             email: "problem.edward@confilogi.com".into(),
+            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
             full_name: "Edward Problem".into(),
-            ms_token: "ms_token_5".into(),
             role_id: 3,
         },
     ];
@@ -85,7 +80,7 @@ async fn seed(db_pool: &Pool<Postgres>) {
             .await
             .unwrap()
         {
-            uow.create_user(&user.email, &user.full_name, &user.ms_token, user.role_id)
+            uow.create_user(&user.email, &user.full_name, &user.password, user.role_id)
                 .await
                 .unwrap();
         }
@@ -117,27 +112,15 @@ async fn main() {
 
     println!("Database seeded successfully.");
 
-    let html_router = axum::Router::new()
-        .route("/", get(handlers::login_page))
-        .route(
-            "/showcase/login",
-            get(handlers::showcase_login_page).post(handlers::showcase_login),
-        )
-        .route("/report", get(handlers::report_problem_page))
-        .route("/report/onboarding", get(handlers::report_onboarding_page))
-        .layer(axum::middleware::from_fn_with_state(
-            db_pool.clone(),
-            handlers::session_middleware,
-        ))
-        .layer(CookieLayer::strict())
+    let api_router = axum::Router::new()
+        .route("/login", post(handlers::login))
+        .route("/user", post(handlers::get_logged_in_user));
+
+    let router = axum::Router::new()
+        .nest("/api", api_router)
         .with_state(db_pool);
 
-    let router = axum::Router::new().merge(html_router).nest(
-        "/assets",
-        axum::Router::new().route("/{*fileabspath}", get(handlers::render_assets)),
-    );
-
-    let tcp_listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+    let tcp_listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();
 
     axum::serve(tcp_listener, router).await.unwrap();
 }

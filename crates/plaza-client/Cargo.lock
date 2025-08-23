@@ -588,6 +588,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "implicit-clone"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1689b939ee35e3a075b0834b5672efd43aec8a6e81a1c6002b76a5ca2f211ae0"
+dependencies = [
+ "implicit-clone-derive",
+]
+
+[[package]]
 name = "implicit-clone-derive"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -772,11 +781,15 @@ dependencies = [
 name = "plaza-client"
 version = "0.1.0"
 dependencies = [
+ "implicit-clone 0.6.0",
+ "js-sys",
  "log",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
+ "wasm-bindgen-futures",
  "wasm-logger",
+ "web-sys",
  "yew",
  "yew-router",
 ]
@@ -1368,7 +1381,7 @@ dependencies = [
  "console_error_panic_hook",
  "futures",
  "gloo 0.10.0",
- "implicit-clone",
+ "implicit-clone 0.4.9",
  "indexmap",
  "js-sys",
  "prokio",

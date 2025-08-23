@@ -1,3 +1,4 @@
+pub mod report;
 pub mod page_not_found;
 pub mod home;
 pub mod report_problem;
@@ -9,3 +10,4 @@ pub use home::*;
 pub use report_problem::*;
 pub use my_tickets::*;
 pub use login::*;
+pub use report::*;

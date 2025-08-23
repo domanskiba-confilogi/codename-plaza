@@ -18,7 +18,7 @@ impl Component for ReportProblem {
 
         let redirect_to_onboarding = {
             let navigator = navigator.clone();
-            Callback::from(move |_: MouseEvent| navigator.push(&Route::Home))
+            Callback::from(move |_: MouseEvent| navigator.push(&Route::ReportOnboarding))
         };
 
         let redirect_to_offboarding = {

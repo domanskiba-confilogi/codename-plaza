@@ -1,1 +1,9 @@
-@import "tailwindcss"
+@import "tailwindcss";
+
+.choose-text-field-wrapper:not(:focus-within) .choose-text-field-suggestions {
+	display: none;
+}
+
+* {
+	scrollbar-color: theme('color.neutral.600') theme('color.neutral.900');
+}

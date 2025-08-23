@@ -1,9 +1,10 @@
 mod app;
 mod icons;
 mod pages;
+mod text_field;
+mod select_field;
 
 use app::App;
-
 use tracing_subscriber::{filter::Targets, prelude::*};
 use tracing_web::MakeWebConsoleWriter;
 
