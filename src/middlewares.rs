@@ -4,7 +4,7 @@ use axum_macros::debug_middleware;
 use crate::UnitOfWork;
 
 #[debug_middleware]
-pub async fn mus_be_logged_in(
+pub async fn must_be_logged_in(
     State(pool): State<Pool<Postgres>>,
     mut request: Request,
     next: Next,

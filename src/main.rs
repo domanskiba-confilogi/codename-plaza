@@ -9,6 +9,7 @@ use tokio::net::TcpListener;
 mod middlewares;
 mod uow;
 mod handlers;
+mod validation;
 
 #[cfg(debug_assertions)]
 const IS_BUILD_DEBUG: bool = true;
@@ -112,12 +113,23 @@ async fn main() {
 
     println!("Database seeded successfully.");
 
-    let api_router = axum::Router::new()
-        .route("/login", post(handlers::login))
-        .route("/user", post(handlers::get_logged_in_user));
+    let auth_router = axum::Router::new()
+        .route("/user", post(handlers::get_logged_in_user))
+        .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in))
+        .route("/login", post(handlers::login));
+
+    let job_titles_router = axum::Router::new()
+        .route("/", get(handlers::get_job_titles))
+        .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
+
+    let company_departments_router = axum::Router::new()
+        .route("/", get(handlers::get_company_departments))
+        .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
 
     let router = axum::Router::new()
-        .nest("/api", api_router)
+        .nest("/auth", auth_router)
+        .nest("/company-departments", company_departments_router)
+        .nest("/job-titles", job_titles_router)
         .with_state(db_pool);
 
     let tcp_listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();

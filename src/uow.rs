@@ -1,4 +1,5 @@
 use sqlx::{Pool, Postgres, Transaction};
+use std::borrow::Cow;
 
 pub struct UnitOfWork<'a> {
     transaction: Transaction<'a, sqlx::Postgres>,
@@ -67,7 +68,7 @@ impl<'a> UnitOfWork<'a> {
         let mut token = String::new();
         const ALPHABET: &str = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890";
 
-        for _ in 0..32 {
+        for _ in 0..64 {
             token.push(
                 ALPHABET
                     .chars()
@@ -148,6 +149,20 @@ impl<'a> UnitOfWork<'a> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles")
             .fetch_all(&mut *self.transaction)
             .await
+    }
+
+    pub async fn get_authorization_token_ids_by_user_id(&mut self, user_id: i32) -> Result<Vec<i32>, sqlx::Error> {
+        sqlx::query_scalar!("SELECT id FROM authorization_tokens WHERE user_id = $1 ORDER BY id", user_id)
+            .fetch_all(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn delete_authorization_tokens_by_ids<'b>(&mut self, authorization_tokens: &[i32]) -> Result<(), sqlx::Error> {
+        sqlx::query!("DELETE FROM authorization_tokens WHERE id = ANY($1)", authorization_tokens)
+            .execute(&mut *self.transaction)
+            .await?;
+
+        Ok(())
     }
 }
 
