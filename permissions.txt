@@ -1,0 +1,24 @@
+Zespoły agentów:
+ - PL: PLP1/PLP2/PLP3/PLBF/Return PL
+ - EU1: CZP1/CZP2/CZP3/Return CZ/SKP1/SKP2/SKP3/Return SK
+ - EU2: SIP1/SIP2/SIRR
+ - EU3: BGP1/BGP2/Return BG
+
+VICI PL -> 
+VICI EU1 -> 
+VICI EU2 -> 
+VICI EU3 -> 
+
+Player PL -> Kampanie: EXTRKASA, INDYW1, KAMPPV, KAMPRR, MILFORD1, PLBF, PLP3, RETURN, PLAK1a, PLAK2a, PLAK3a, PLAK4a, PLAK5a, PLAK6a, PLAK7a, PLAK8a, PLAKLOS, PLAKRE, PLAKWIND
+Player EU -> CZ_RR, CZBF, CZCancel, CZconfil, CZDARPRO, CZEKSTRA, czmarket, CZminifo, CZmonety, czonline, CZP0, CZP2, CZP3, czpress, czprtest, CZPVkamp, CZPVO, czreturn, czwbezfi, SK_RR, SKBF, SKCancel, skconfil, SKDARPRO, SKEXTRA, SKminifo, SKmonety, Skonline, SKP0, SKP2, SKP3, skpress, SKPVkamp, SKPVO, skreturn, skwbezfi, SI_RR, SIbezfin, SIconfil, SIminifo, SIMonety, sionline, SIP2, SIPRESS, SIPV, SIPVO, SIRETURN
+
+CRM PL -> Zakładka SALES, Zakładka Marketing, Wallboard Managerski PL
+CRM EU -> Zakładka SALES, Zakładka Marketing, Wallboard Managerski CZ, Wallboard Managerski SK, Wallboard Managerski SI, Wallboard Managerski BG
+
+OVH PLAYER -> admin, HRP1
+OVH VICI -> User Group -> HRP1, HRP2, HRRR
+ODOO - Other -> Confilogi -> Employee / Manager 
+
+BITRIX -> Nowe konto
+WMS ANTEO - uprawnienia takie jak inna osoba
+

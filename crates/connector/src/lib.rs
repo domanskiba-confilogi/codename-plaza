@@ -1,0 +1,186 @@
+use axum::{Json, response::{Response, IntoResponse}, http::StatusCode};
+use crate::i18n::Language;
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub enum BadRequestError {
+    Message {
+        message: String,
+    },
+    Validation(ValidationError),
+}
+
+impl IntoResponse for BadRequestError {
+    fn into_response(self) -> Response {
+        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct CompanyDepartmentDto {
+    pub id: i32,
+    pub name: String
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct ExternalPermissionDto {
+    pub id: i32,
+    pub name: String
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct JobTitleDto {
+    pub id: i32,
+    pub name: String,
+    pub company_department_id: i32,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct UserDto {
+    pub id: i32,
+    pub email: String,
+    pub full_name: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct LoginRequestBody {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct LoginResponse {
+    pub user: UserDto,
+    pub authorization_token: String,
+}
+
+use i18n::{FieldTranslationKey, TranslationKey, Translate};
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ValidationError {
+    pub property_name: FieldTranslationKey,
+    pub translation: TranslationKey,
+}
+
+impl ValidationError {
+    pub fn into_with_translation(self, language: Language) -> ValidationErrorWithTranslation {
+        ValidationErrorWithTranslation {
+            property_name: self.property_name,
+            message: self.translation.translate(language),
+            translation: self.translation,
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ValidationErrorWithTranslation {
+    pub property_name: FieldTranslationKey,
+    pub message: String,
+    pub translation: TranslationKey,
+}
+
+impl IntoResponse for ValidationErrorWithTranslation {
+    fn into_response(self) -> Response {
+        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+    }
+}
+
+pub mod i18n {
+    use crate::{ValidationError};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Language {
+        Polish,
+    }
+
+    pub trait Validator {
+        fn validate(self) -> Result<(), ValidationError>;
+    }
+
+    pub trait Translate {
+        fn translate(&self, language: Language) -> String;
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+    #[serde(tag = "type", content = "data")]
+    pub enum TranslationKey {
+        Validation(ValidationTranslationKey),
+        Field(FieldTranslationKey),
+    }
+
+    impl Translate for TranslationKey {
+        fn translate(&self, language: Language) -> String {
+            match self {
+                TranslationKey::Validation(validation_translation_key) => validation_translation_key.translate(language),
+                TranslationKey::Field(field_translation_key) => field_translation_key.translate(language),
+            }
+        }
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+    #[serde(tag = "type", content = "data")]
+    pub enum FieldTranslationKey {
+        Email,
+        Password,
+    }
+
+    impl Translate for FieldTranslationKey {
+        fn translate(&self, language: Language) -> String {
+            match self {
+                FieldTranslationKey::Email => {
+                    match language {
+                        Language::Polish => format!("email"),
+                    }
+                },
+                FieldTranslationKey::Password => {
+                    match language {
+                        Language::Polish => format!("hasło"),
+                    }
+                }
+            }
+        }
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+    #[serde(tag = "type", content = "data")]
+    pub enum ValidationTranslationKey {
+        StringTooShort {
+            property_name: FieldTranslationKey,
+            min_length: usize,
+        },
+        StringTooLong {
+            property_name: FieldTranslationKey,
+            max_length: usize,
+        },
+        InvalidEmail {
+            property_name: FieldTranslationKey,
+        },
+        InvalidCredentials,
+    }
+
+    impl Translate for ValidationTranslationKey {
+        fn translate(&self, language: Language) -> String {
+            match self {
+                ValidationTranslationKey::StringTooShort { property_name, min_length } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" jest za krótkie, minimum {min_length} znaków.", property_name.translate(language)),
+                    }
+                },
+                ValidationTranslationKey::StringTooLong { property_name, max_length } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" jest za długi, maksimum {max_length} znaków.", property_name.translate(language)),
+                    }
+                }
+                ValidationTranslationKey::InvalidEmail { property_name } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" jest niepoprawnym adresem mailowym.", property_name.translate(language)),
+                    }
+                }
+                ValidationTranslationKey::InvalidCredentials => {
+                    match language {
+                        Language::Polish => format!("Email lub hasło są nieprawidłowe")
+                    }
+                }
+            }
+        }
+    }
+}

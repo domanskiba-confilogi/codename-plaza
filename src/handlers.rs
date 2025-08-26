@@ -9,55 +9,11 @@ use axum_macros::debug_handler;
 use sqlx::{Pool, Postgres};
 use crate::{UnitOfWork, UserEntity};
 use std::borrow::Cow;
-use crate::validation::{LoginValidator, Validator, Language, FieldTranslationKey, TranslationKey, ValidationTranslationKey, ValidationError};
+use connector::*;
 use serde_json::json;
 use tokio::time::{Duration, Instant};
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct BadRequestError<'a> {
-    title: Cow<'a, str>,
-    message: Cow<'a, str>,
-}
-
-impl IntoResponse for BadRequestError<'_> {
-    fn into_response(self) -> Response {
-        (StatusCode::BAD_REQUEST, Json(self)).into_response()
-    }
-}
-
-impl<'a> BadRequestError<'a> {
-    pub fn new(title: impl Into<Cow<'a, str>>, message: impl Into<Cow<'a, str>>) -> Self {
-        Self {
-            title: title.into(),
-            message: message.into(),
-        }
-    }
-}
-
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct UnauthorizedError;
-
-impl UnauthorizedError {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl IntoResponse for UnauthorizedError {
-    fn into_response(self) -> Response {
-        (StatusCode::UNAUTHORIZED, Json(json!({
-            "title": "Unauthorized",
-            "message": "You are unauthorized to view this resource."
-        }))).into_response()
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct LoginRequestBody {
-    email: String,
-    password: String,
-}
+use connector::{*, i18n::*};
+use crate::validation::LoginValidator;
 
 #[debug_handler]
 pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginRequestBody>) -> Result<Response, Response> {
@@ -104,7 +60,11 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
         }
 
         return Ok((StatusCode::OK, Json(LoginResponse {
-            user: UserDto::from(user),
+            user: UserDto {
+                id: user.id,
+                email: user.email,
+                full_name: user.full_name
+            },
             authorization_token,
         })).into_response());
     }
@@ -115,32 +75,13 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
     }.into_with_translation(Language::Polish).into_response());
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct LoginResponse {
-    user: UserDto,
-    authorization_token: String,
-}
-
 #[debug_handler]
 pub async fn get_logged_in_user(Extension(user): Extension<UserEntity>) -> Response {
-    (StatusCode::OK, Json(UserDto::from(user))).into_response()
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-struct UserDto {
-    id: i32,
-    email: String,
-    full_name: String,
-}
-
-impl From<UserEntity> for UserDto {
-    fn from(value: UserEntity) -> Self {
-        Self {
-            id: value.id,
-            email: value.email,
-            full_name: value.full_name
-        }
-    }
+    (StatusCode::OK, Json(UserDto {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name
+    })).into_response()
 }
 
 pub async fn get_company_departments(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
@@ -174,16 +115,32 @@ pub async fn get_job_titles(State(db_pool): State<Pool<Postgres>>) -> Result<Res
     }).collect::<Vec<JobTitleDto>>())).into_response())
 }
 
+pub async fn get_external_permissions(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct CompanyDepartmentDto {
-    id: i32,
-    name: String
+    let permissions = uow.get_external_permissions().await.unwrap().into_iter().map(|external_permission| {
+        ExternalPermissionDto {
+            id: external_permission.id,
+            name: external_permission.name,
+        }
+    }).collect::<Vec<ExternalPermissionDto>>();
+
+    Ok((StatusCode::OK, Json(permissions)).into_response())
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct JobTitleDto {
-    id: i32,
-    name: String,
-    company_department_id: i32,
+pub struct UnauthorizedError {}
+
+impl UnauthorizedError {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl IntoResponse for UnauthorizedError {
+    fn into_response(self) -> Response {
+        (StatusCode::UNAUTHORIZED, Json(json!({
+            "title": "Unauthorized",
+            "message": "You are unauthorized to view this resource."
+        }))).into_response()
+    }
 }

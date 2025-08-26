@@ -157,13 +157,23 @@ impl<'a> UnitOfWork<'a> {
             .await
     }
 
-    pub async fn delete_authorization_tokens_by_ids<'b>(&mut self, authorization_tokens: &[i32]) -> Result<(), sqlx::Error> {
+    pub async fn delete_authorization_tokens_by_ids(&mut self, authorization_tokens: &[i32]) -> Result<(), sqlx::Error> {
         sqlx::query!("DELETE FROM authorization_tokens WHERE id = ANY($1)", authorization_tokens)
             .execute(&mut *self.transaction)
             .await?;
 
         Ok(())
     }
+
+    pub async fn get_external_permissions(&mut self) -> Result<Vec<ExternalPermissionEntity>, sqlx::Error> {
+        sqlx::query_as!(ExternalPermissionEntity, "SELECT * FROM external_permissions").fetch_all(&mut *self.transaction).await
+    }
+}
+
+#[derive(sqlx::FromRow, Clone, Debug, Default)]
+pub struct ExternalPermissionEntity {
+    pub id: i32,
+    pub name: String,
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
