@@ -6,6 +6,7 @@ mod select_field;
 mod api;
 mod fatal_error;
 mod authorization_state;
+mod route_guard;
 
 use app::App;
 use tracing_subscriber::{filter::Targets, prelude::*};

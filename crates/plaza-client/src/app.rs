@@ -5,6 +5,7 @@ use crate::pages::*;
 use crate::icons::MenuIcon;
 use crate::fatal_error::*;
 use crate::authorization_state::AuthorizationState;
+use crate::route_guard::RouteGuard;
 
 pub struct App {
     mobile_navbar_show: bool,
@@ -59,22 +60,6 @@ impl Component for App {
                 self.mobile_navbar_show = !self.mobile_navbar_show;
                 true
             }
-            Self::Message::NewRoute => {
-                log::info!("test");
-                let authorization_state = self.state.authorization_state.clone();
-                let route = ctx.link().route::<Route>();
-
-                wasm_bindgen_futures::spawn_local(async move {
-                    log::info!(
-r##"New route requested: {:?}
-Is logged in: {}"##, 
-                    route,
-                    authorization_state.is_logged_in().await
-                    );
-                });
-
-                true
-            }
         }
     }
 
@@ -90,6 +75,7 @@ Is logged in: {}"##,
         html! {
             <ContextProvider<AppState> context={self.state.clone()}>
                 <BrowserRouter>
+                    <RouteGuard />
                     <FatalErrorModal />
 
                     <div class="min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col">
