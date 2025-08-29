@@ -141,20 +141,3 @@ pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result
 
     Ok((StatusCode::OK, Json(mailing_groups)).into_response())
 }
-
-pub struct UnauthorizedError {}
-
-impl UnauthorizedError {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl IntoResponse for UnauthorizedError {
-    fn into_response(self) -> Response {
-        (StatusCode::UNAUTHORIZED, Json(json!({
-            "title": "Unauthorized",
-            "message": "You are unauthorized to view this resource."
-        }))).into_response()
-    }
-}

@@ -79,6 +79,21 @@ pub struct ValidationErrorWithTranslation {
     pub translation: TranslationKey,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct UnauthorizedError {
+    title: String,
+    message: String,
+}
+
+impl UnauthorizedError {
+    pub fn new() -> Self {
+        Self {
+            title: "Unauthorized".to_string(),
+            message: "You are unauthorized to view this resource.".to_string()
+        }
+    }
+}
+
 #[cfg(feature = "server-side")]
 impl axum::response::IntoResponse for ValidationErrorWithTranslation {
     fn into_response(self) -> axum::response::Response {
@@ -90,6 +105,13 @@ impl axum::response::IntoResponse for ValidationErrorWithTranslation {
 impl axum::response::IntoResponse for BadRequestError {
     fn into_response(self) -> axum::response::Response {
         (axum::http::StatusCode::BAD_REQUEST, axum::Json(self)).into_response()
+    }
+}
+
+#[cfg(feature = "server-side")]
+impl axum::response::IntoResponse for UnauthorizedError {
+    fn into_response(self) -> axum::response::Response {
+        (axum::http::StatusCode::UNAUTHORIZED, axum::Json(self)).into_response()
     }
 }
 

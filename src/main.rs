@@ -114,7 +114,7 @@ async fn main() {
     println!("Database seeded successfully.");
 
     let auth_router = axum::Router::new()
-        .route("/user", post(handlers::get_logged_in_user))
+        .route("/user", get(handlers::get_logged_in_user))
         .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in))
         .route("/login", post(handlers::login));
 

@@ -19,6 +19,7 @@ pub enum LoginMessage {
     UpdatePassword(String),
     FormSubmitted,
     FormSuccess(LoginResponse),
+    FormSuccessProcessingFinished,
     FormValidationError(ValidationErrorWithTranslation),
     FormError(LoginError),
 }
@@ -78,7 +79,24 @@ impl Component for Login {
                 return true;
             },
             Self::Message::FormSuccess(success_response) => {
+                let state = ctx.link().context::<AppState>(Callback::noop()).expect("expected a valid global state handle").0;
+
+                let link = ctx.link().clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    state.authorization_state.set_logged_in_user(
+                        success_response.user, 
+                        success_response.authorization_token
+                    ).await;
+
+                    link.send_message(Self::Message::FormSuccessProcessingFinished);
+                });
+
+                return false;
+            }
+            Self::Message::FormSuccessProcessingFinished => {
                 self.loading = false;
+
+                ctx.link().navigator().expect("expected a valid navigation handle").push(&Route::Home);
 
                 return true;
             }

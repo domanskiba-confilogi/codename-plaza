@@ -21,6 +21,8 @@ impl Component for RouteGuard {
             .link()
             .add_location_listener(link.callback(move |_| Self::Message::NewRoute))
             .unwrap();
+        
+        ctx.link().send_message(Msg::NewRoute);
 
         Self { _listener: listener }
     }

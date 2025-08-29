@@ -2,7 +2,7 @@ use sqlx::{Pool, Postgres};
 use axum::{middleware::Next, extract::{Request, State}, response::Response};
 use axum_macros::debug_middleware;
 use crate::UnitOfWork;
-use crate::handlers::UnauthorizedError;
+use connector::UnauthorizedError;
 use axum::response::IntoResponse;
 
 #[debug_middleware]
