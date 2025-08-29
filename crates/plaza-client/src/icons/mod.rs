@@ -9,6 +9,7 @@ pub mod bar_chart_icon;
 pub mod alert_icon;
 pub mod unlock_icon;
 pub mod x_icon;
+pub mod loading_icon;
 
 pub use confilogi_icon::*;
 pub use menu_icon::*;
@@ -21,3 +22,4 @@ pub use bar_chart_icon::*;
 pub use alert_icon::*;
 pub use unlock_icon::*;
 pub use x_icon::*;
+pub use loading_icon::*;

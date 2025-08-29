@@ -3,8 +3,6 @@ use yew::prelude::*;
 use std::fmt::Debug;
 use web_sys::HtmlInputElement;
 use crate::icons::XIcon;
-use implicit_clone::sync::IArray;
-use implicit_clone::ImplicitClone;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SelectFieldItem {

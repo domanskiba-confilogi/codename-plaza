@@ -168,6 +168,10 @@ impl<'a> UnitOfWork<'a> {
     pub async fn get_external_permissions(&mut self) -> Result<Vec<ExternalPermissionEntity>, sqlx::Error> {
         sqlx::query_as!(ExternalPermissionEntity, "SELECT * FROM external_permissions").fetch_all(&mut *self.transaction).await
     }
+
+    pub async fn get_mailing_groups(&mut self) -> Result<Vec<MailingGroupEntity>, sqlx::Error> {
+        sqlx::query_as!(MailingGroupEntity, "SELECT * FROM mailing_groups").fetch_all(&mut *self.transaction).await
+    }
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
@@ -181,6 +185,13 @@ pub struct JobTitleEntity {
     pub id: i32,
     pub name: String,
     pub company_department_id: i32,
+}
+
+#[derive(sqlx::FromRow, Clone, Debug, Default)]
+pub struct MailingGroupEntity {
+    pub id: i32,
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]

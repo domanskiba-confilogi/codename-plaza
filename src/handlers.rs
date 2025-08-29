@@ -128,6 +128,20 @@ pub async fn get_external_permissions(State(db_pool): State<Pool<Postgres>>) -> 
     Ok((StatusCode::OK, Json(permissions)).into_response())
 }
 
+pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let mailing_groups = uow.get_mailing_groups().await.unwrap().into_iter().map(|mailing_group| {
+        MailingGroupDto {
+            id: mailing_group.id,
+            name: mailing_group.name,
+            email: mailing_group.email,
+        }
+    }).collect::<Vec<MailingGroupDto>>();
+
+    Ok((StatusCode::OK, Json(mailing_groups)).into_response())
+}
+
 pub struct UnauthorizedError {}
 
 impl UnauthorizedError {

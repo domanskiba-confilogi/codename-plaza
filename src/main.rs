@@ -130,11 +130,16 @@ async fn main() {
         .route("/", get(handlers::get_external_permissions))
         .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
 
+    let mailing_groups_router = axum::Router::new()
+        .route("/", get(handlers::get_mailing_groups))
+        .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
+
     let router = axum::Router::new()
         .nest("/auth", auth_router)
         .nest("/company-departments", company_departments_router)
         .nest("/job-titles", job_titles_router)
         .nest("/external-permissions", external_permissions_router)
+        .nest("/mailing-groups", mailing_groups_router)
         .with_state(db_pool);
 
     let tcp_listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();

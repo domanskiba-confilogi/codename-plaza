@@ -1,5 +1,5 @@
 [[proxy]]
-backend = "http://localhost:8081/api" # Address to proxy requests to
+backend = "http://localhost:8081/" # Address to proxy requests to
 ws = false                                # Use WebSocket for this proxy
 insecure = false                          # Disable certificate validation
 no_system_proxy = false                   # Disable system proxy

@@ -2,16 +2,25 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 use crate::app::Route;
 use crate::text_field::*;
+use connector::{LoginRequestBody, LoginResponse, ValidationErrorWithTranslation, BadRequestError};
+use crate::api::{ApiClient, LoginError};
+use crate::app::AppState;
+use crate::icons::LoadingIcon;
 
 pub struct Login {
     email: String,
     password: String,
+    validation_error: Option<ValidationErrorWithTranslation>,
+    loading: bool,
 }
 
 pub enum LoginMessage {
     UpdateEmail(String),
     UpdatePassword(String),
     FormSubmitted,
+    FormSuccess(LoginResponse),
+    FormValidationError(ValidationErrorWithTranslation),
+    FormError(LoginError),
 }
 
 impl Component for Login {
@@ -22,6 +31,8 @@ impl Component for Login {
         Self {
             email: String::new(),
             password: String::new(),
+            validation_error: None,
+            loading: false,
         }
     }
 
@@ -29,16 +40,63 @@ impl Component for Login {
         match msg {
             Self::Message::UpdateEmail(email) => {
                 self.email = email;
+                self.validation_error = None;
+
+                return true;
             },
             Self::Message::UpdatePassword(password) => {
                 self.password = password;
+                self.validation_error = None;
+                
+                return true;
             },
             Self::Message::FormSubmitted => {
-                log::info!("new form submittion: {}:{}", self.email, self.password);
+                self.loading = true;
+
+                let body = LoginRequestBody {
+                    email: self.email.clone(),
+                    password: self.password.clone(),
+                };
+
+                let scope = ctx.link().clone();
+
+                wasm_bindgen_futures::spawn_local(async move {
+                    match ApiClient::new().login(body).await {
+                        Ok(json) => scope.send_message(Self::Message::FormSuccess(json)),
+                        Err(error) => match error {
+                            LoginError::BadRequest(ref bad_request) => match bad_request {
+                                BadRequestError::ValidationWithTranslation(validation_error) => {
+                                    scope.send_message(Self::Message::FormValidationError(validation_error.clone()));
+                                },
+                                _ => scope.send_message(Self::Message::FormError(error)),
+                            }
+                            _ => scope.send_message(Self::Message::FormError(error)),
+                        }
+                    }
+                });
+
+                return true;
+            },
+            Self::Message::FormSuccess(success_response) => {
+                self.loading = false;
+
+                return true;
+            }
+            Self::Message::FormError(error) => {
+                let state = ctx.link().context::<AppState>(Callback::noop()).expect("global state to be present").0;
+                state.fatal_error_state.report(error);
+                self.loading = false;
+
+                return true;
+            }
+            Self::Message::FormValidationError(error) => {
+                self.validation_error = Some(error);
+                self.loading = false;
+
+                return true;
             }
         };
 
-        false
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
@@ -87,10 +145,30 @@ impl Component for Login {
                                 <hr class="text-neutral-600 w-full" />
                             </div>
 
-                            <TextField field_type={TextFieldType::Email} oninput={update_email}>{"Email"}</TextField>
-                            <TextField field_type={TextFieldType::Password} oninput={update_password}>{"Hasło"}</TextField>
+                            {
+                                match &self.validation_error {
+                                    Some(validation_error) => html! {
+                                        <div class="px-4 py-3 bg-red-600/15 border-3 border-red-900 rounded-xl w-full">
 
-                            <button class="px-8 py-2 border-3 border-blue-600 w-full rounded-xl cursor-pointer hover:bg-blue-800 duration-300 uppercase tracking-widest text-blue-600 hover:border-blue-800 hover:text-neutral-200 font-semibold">
+                                            {&validation_error.message}
+                                        </div>
+                                    },
+                                    None => html! {}
+                                }
+                            }
+
+                            <TextField disabled={self.loading} field_type={TextFieldType::Email} oninput={update_email}>{"Email"}</TextField>
+                            <TextField disabled={self.loading} field_type={TextFieldType::Password} oninput={update_password}>{"Hasło"}</TextField>
+
+                            <button disabled={self.loading} class="px-8 py-2 border-3 border-blue-600 w-full rounded-xl cursor-pointer hover:bg-blue-800 focus:bg-blue-800 disabled:bg-blue-800 duration-300 uppercase tracking-widest text-blue-600 hover:border-blue-800 hover:text-neutral-200 focus:border-blue-800 focus:text-neutral-200 disabled:border-blue-800 disabled:text-neutral-200 font-semibold flex flex-row gap-2 justify-center items-center">
+                                { if self.loading {
+                                    html! {
+                                        <LoadingIcon classes="w-6 aspect-square animate-spin" />
+                                    }
+                                } else {
+                                    html! {}
+                                } }
+
                                 {"Zaloguj"}
                             </button>
                         </form>

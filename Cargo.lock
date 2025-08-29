@@ -388,7 +388,6 @@ name = "connector"
 version = "0.1.0"
 dependencies = [
  "axum",
- "email_address",
  "serde",
 ]
 

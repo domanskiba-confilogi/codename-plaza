@@ -2,6 +2,7 @@ use std::rc::Rc;
 use yew::prelude::*;
 use crate::text_field::*;
 use crate::select_field::*;
+use connector::{CompanyDepartmentDto, JobTitleDto};
 
 pub struct ReportOnboarding {
     downloaded_job_titles: Option<Vec<JobTitleDto>>,

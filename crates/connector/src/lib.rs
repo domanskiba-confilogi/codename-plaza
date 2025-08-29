@@ -1,4 +1,3 @@
-use axum::{Json, response::{Response, IntoResponse}, http::StatusCode};
 use crate::i18n::Language;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -7,12 +6,7 @@ pub enum BadRequestError {
         message: String,
     },
     Validation(ValidationError),
-}
-
-impl IntoResponse for BadRequestError {
-    fn into_response(self) -> Response {
-        (StatusCode::BAD_REQUEST, Json(self)).into_response()
-    }
+    ValidationWithTranslation(ValidationErrorWithTranslation),
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -34,11 +28,18 @@ pub struct JobTitleDto {
     pub company_department_id: i32,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct UserDto {
     pub id: i32,
     pub email: String,
     pub full_name: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct MailingGroupDto {
+    pub id: i32,
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -71,16 +72,24 @@ impl ValidationError {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct ValidationErrorWithTranslation {
     pub property_name: FieldTranslationKey,
     pub message: String,
     pub translation: TranslationKey,
 }
 
-impl IntoResponse for ValidationErrorWithTranslation {
-    fn into_response(self) -> Response {
-        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+#[cfg(feature = "server-side")]
+impl axum::response::IntoResponse for ValidationErrorWithTranslation {
+    fn into_response(self) -> axum::response::Response {
+        BadRequestError::ValidationWithTranslation(self).into_response()
+    }
+}
+
+#[cfg(feature = "server-side")]
+impl axum::response::IntoResponse for BadRequestError {
+    fn into_response(self) -> axum::response::Response {
+        (axum::http::StatusCode::BAD_REQUEST, axum::Json(self)).into_response()
     }
 }
 
@@ -162,12 +171,12 @@ pub mod i18n {
             match self {
                 ValidationTranslationKey::StringTooShort { property_name, min_length } => {
                     match language {
-                        Language::Polish => format!("Pole \"{}\" jest za krótkie, minimum {min_length} znaków.", property_name.translate(language)),
+                        Language::Polish => format!("Pole \"{}\" jest za krótkie, minimum {min_length} znaki.", property_name.translate(language)),
                     }
                 },
                 ValidationTranslationKey::StringTooLong { property_name, max_length } => {
                     match language {
-                        Language::Polish => format!("Pole \"{}\" jest za długi, maksimum {max_length} znaków.", property_name.translate(language)),
+                        Language::Polish => format!("Pole \"{}\" jest za długi, maksimum {max_length} znaki.", property_name.translate(language)),
                     }
                 }
                 ValidationTranslationKey::InvalidEmail { property_name } => {

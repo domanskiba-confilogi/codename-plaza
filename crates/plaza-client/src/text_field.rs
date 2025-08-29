@@ -40,7 +40,9 @@ pub struct TextFieldProperties {
     pub field_type: TextFieldType,
     pub children: Html,
     #[prop_or_default]
-    pub oninput: Option<Callback<TextFieldInputEvent>>
+    pub oninput: Option<Callback<TextFieldInputEvent>>,
+    #[prop_or_default]
+    pub disabled: bool,
 }
 
 impl Component for TextField {
@@ -53,6 +55,10 @@ impl Component for TextField {
             input_element: NodeRef::default(),
             parent_on_input_callback: ctx.props().oninput.clone(),
         }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
+        true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
@@ -74,7 +80,7 @@ impl Component for TextField {
             <div class="w-full max-w-3xl">
                 <div class="flex flex-col gap-2">
                     <label for={self.id.clone()}>{ctx.props().children.clone()}</label>
-                    <input type={ctx.props().field_type.to_string()} ref={self.input_element.clone()} oninput={oninput} class="border-3 border-neutral-800 rounded-xl px-4 py-3 focus:outline-none focus:border-yellow-700/75" id={self.id.clone()} />
+                    <input disabled={ctx.props().disabled} type={ctx.props().field_type.to_string()} ref={self.input_element.clone()} oninput={oninput} class="border-3 border-neutral-800 rounded-xl px-4 py-3 focus:outline-none focus:border-yellow-700/75 disabled:bg-neutral-800" id={self.id.clone()} />
                 </div>
             </div>
         }

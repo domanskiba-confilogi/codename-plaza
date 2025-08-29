@@ -4,13 +4,13 @@ Zespoły agentów:
  - EU2: SIP1/SIP2/SIRR
  - EU3: BGP1/BGP2/Return BG
 
-VICI PL -> 
-VICI EU1 -> 
-VICI EU2 -> 
-VICI EU3 -> 
+VICI PL
+VICI EU1
+VICI EU2
+VICI EU3
 
 Player PL -> Kampanie: EXTRKASA, INDYW1, KAMPPV, KAMPRR, MILFORD1, PLBF, PLP3, RETURN, PLAK1a, PLAK2a, PLAK3a, PLAK4a, PLAK5a, PLAK6a, PLAK7a, PLAK8a, PLAKLOS, PLAKRE, PLAKWIND
-Player EU -> CZ_RR, CZBF, CZCancel, CZconfil, CZDARPRO, CZEKSTRA, czmarket, CZminifo, CZmonety, czonline, CZP0, CZP2, CZP3, czpress, czprtest, CZPVkamp, CZPVO, czreturn, czwbezfi, SK_RR, SKBF, SKCancel, skconfil, SKDARPRO, SKEXTRA, SKminifo, SKmonety, Skonline, SKP0, SKP2, SKP3, skpress, SKPVkamp, SKPVO, skreturn, skwbezfi, SI_RR, SIbezfin, SIconfil, SIminifo, SIMonety, sionline, SIP2, SIPRESS, SIPV, SIPVO, SIRETURN
+Player EU -> Kampanie: CZ_RR, CZBF, CZCancel, CZconfil, CZDARPRO, CZEKSTRA, czmarket, CZminifo, CZmonety, czonline, CZP0, CZP2, CZP3, czpress, czprtest, CZPVkamp, CZPVO, czreturn, czwbezfi, SK_RR, SKBF, SKCancel, skconfil, SKDARPRO, SKEXTRA, SKminifo, SKmonety, Skonline, SKP0, SKP2, SKP3, skpress, SKPVkamp, SKPVO, skreturn, skwbezfi, SI_RR, SIbezfin, SIconfil, SIminifo, SIMonety, sionline, SIP2, SIPRESS, SIPV, SIPVO, SIRETURN
 
 CRM PL -> Zakładka SALES, Zakładka Marketing, Wallboard Managerski PL
 CRM EU -> Zakładka SALES, Zakładka Marketing, Wallboard Managerski CZ, Wallboard Managerski SK, Wallboard Managerski SI, Wallboard Managerski BG

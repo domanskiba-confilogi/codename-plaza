@@ -3,6 +3,9 @@ mod icons;
 mod pages;
 mod text_field;
 mod select_field;
+mod api;
+mod fatal_error;
+mod authorization_state;
 
 use app::App;
 use tracing_subscriber::{filter::Targets, prelude::*};
