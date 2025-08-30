@@ -7,6 +7,7 @@ mod api;
 mod fatal_error;
 mod authorization_state;
 mod route_guard;
+mod suspense_screen;
 
 use app::App;
 use tracing_subscriber::{filter::Targets, prelude::*};

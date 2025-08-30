@@ -14,7 +14,6 @@ impl Component for Home {
 
     fn create(ctx: &Context<Self>) -> Self {
         let global_state = ctx.link().context::<AppState>(Callback::noop()).expect("a valid global state handle").0;
-        let navigator = ctx.link().navigator().expect("a valid navigation handle");
 
         let link = ctx.link().clone();
         wasm_bindgen_futures::spawn_local(async move {

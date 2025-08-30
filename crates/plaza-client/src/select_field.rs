@@ -3,6 +3,8 @@ use yew::prelude::*;
 use std::fmt::Debug;
 use web_sys::HtmlInputElement;
 use crate::icons::XIcon;
+use gloo_timers::future::TimeoutFuture;
+use crate::app::AppState;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SelectFieldItem {
@@ -55,7 +57,7 @@ impl Component for SelectField {
                 let scope = ctx.link().clone();
 
                 wasm_bindgen_futures::spawn_local(async move {
-                    sleep(50).await;
+                    TimeoutFuture::new(50).await;
 
                     scope.send_message(Self::Message::ShowSearchItemsAfterTimeout);
                 });
@@ -63,8 +65,23 @@ impl Component for SelectField {
                 true
             },
             Self::Message::ShowSearchItemsAfterTimeout => {
+                let fatal_error_state = ctx.link().context::<AppState>(Callback::noop()).expect("a valid global state handle").0.fatal_error_state;
+
                 self.show_search_items = true;
-                self.search_input_ref.cast::<HtmlInputElement>().expect("HTML Input Element").focus();
+
+                let input_element = match self.search_input_ref.cast::<HtmlInputElement>() {
+                    Some(value) => value,
+                    None => {
+                        fatal_error_state.report(format!("failed to obtain handle to input html element in select field: {}", self.id));
+                        return true;
+                    }
+                };
+
+                if let Err(error) = input_element.focus() {
+                    fatal_error_state.report(error);
+                    return true;
+                }
+
                 true
             }
             Self::Message::SearchTextFieldChanged(search) => {
@@ -133,15 +150,4 @@ impl Component for SelectField {
             </div>
         }
     }
-}
-
- pub async fn sleep(delay_ms: i32) {
-    let mut cb = |resolve: js_sys::Function, reject: js_sys::Function| {
-        web_sys::window()
-            .unwrap()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, delay_ms);};
-
-    let p = js_sys::Promise::new(&mut cb);
-
-    wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
 }

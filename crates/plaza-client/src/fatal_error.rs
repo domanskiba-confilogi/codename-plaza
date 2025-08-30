@@ -1,12 +1,10 @@
-use std::sync::LazyLock;
 use std::collections::VecDeque;
-use std::ops::DerefMut;
-use std::sync::Arc;
 use yew::prelude::*;
 use std::rc::Rc;
 use gloo_timers::future::TimeoutFuture;
 use std::cell::RefCell;
 use crate::app::AppState;
+use std::fmt::Debug;
 
 #[derive(Clone, PartialEq)]
 pub struct FatalErrorState {
@@ -18,7 +16,7 @@ impl FatalErrorState {
         Self { inner: Rc::new(RefCell::new(VecDeque::new())) }
     }
 
-    pub fn report<T: Sized + std::error::Error>(&self, error: T) {
+    pub fn report<T: Sized + Debug>(&self, error: T) {
         let error = format!("{error:?}");
 
         log::error!("FATAL ERROR OCCURED: {error:?}");
@@ -82,7 +80,7 @@ impl Component for FatalErrorModal {
         Self { errors: Vec::new() }
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Self::Message::ShowError(message) => {
                 self.errors.push(message);

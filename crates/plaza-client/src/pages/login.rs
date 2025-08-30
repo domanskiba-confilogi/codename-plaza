@@ -83,10 +83,12 @@ impl Component for Login {
 
                 let link = ctx.link().clone();
                 wasm_bindgen_futures::spawn_local(async move {
-                    state.authorization_state.set_logged_in_user(
+                    if let Err(error) = state.authorization_state.set_logged_in_user(
                         success_response.user, 
                         success_response.authorization_token
-                    ).await;
+                    ).await {
+                        state.fatal_error_state.report(error);
+                    }
 
                     link.send_message(Self::Message::FormSuccessProcessingFinished);
                 });

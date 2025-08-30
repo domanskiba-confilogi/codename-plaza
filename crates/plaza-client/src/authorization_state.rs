@@ -5,9 +5,14 @@ use std::rc::Rc;
 use gloo_timers::future::TimeoutFuture;
 
 #[derive(Clone, PartialEq)]
+struct AuthorizationStateShape {
+    user: Option<UserDto>,
+    authorization_token: Option<String>,
+}
+
+#[derive(Clone, PartialEq)]
 pub struct AuthorizationState {
-    user: Rc<RefCell<Option<UserDto>>>,
-    token: Rc<RefCell<Option<String>>>,
+    inner: Rc<RefCell<AuthorizationStateShape>>,
 }
 
 enum LocalStorageKey {
@@ -25,8 +30,10 @@ impl AsRef<str> for LocalStorageKey {
 impl AuthorizationState {
     pub fn new() -> Result<Self, StorageError> {
         Ok(Self {
-            user: Rc::new(RefCell::new(None)),
-            token: Rc::new(RefCell::new(Self::authorization_token_from_localstorage()?)),
+            inner: Rc::new(RefCell::new(AuthorizationStateShape {
+                user: None,
+                authorization_token: Self::authorization_token_from_localstorage()?,
+            })),
         })
     }
 
@@ -44,20 +51,16 @@ impl AuthorizationState {
         }
     }
 
-    fn set_logged_in_user_inside_localstorage(user: UserDto, authorization_token: String) -> Result<(), StorageError> {
-        LocalStorage::set(LocalStorageKey::Token, authorization_token)
-    }
-
     fn remove_logged_in_user_from_localstorage() {
         LocalStorage::delete(LocalStorageKey::Token);
     }
 
     pub async fn logged_in_user(&self) -> Option<UserDto> {
-        let accessor = self.user.clone();
+        let accessor = self.inner.clone();
 
         loop {
             match accessor.try_borrow() {
-                Ok(data) => return data.clone(),
+                Ok(data) => return data.user.clone(),
                 Err(_) => {
                     TimeoutFuture::new(10).await;
                 }
@@ -66,11 +69,11 @@ impl AuthorizationState {
     }
 
     pub async fn authorization_token(&self) -> Option<String> {
-        let accessor = self.token.clone();
+        let accessor = self.inner.clone();
 
         loop {
             match accessor.try_borrow() {
-                Ok(data) => return data.clone(),
+                Ok(data) => return data.authorization_token.clone(),
                 Err(_) => {
                     TimeoutFuture::new(10).await;
                 }
@@ -79,13 +82,14 @@ impl AuthorizationState {
     }
 
     pub async fn set_logged_in_user(&self, user: UserDto, authorization_token: String) -> Result<(), StorageError>{
-        let accessor = self.user.clone();
+        let accessor = self.inner.clone();
 
         loop {
             match accessor.try_borrow_mut() {
                 Ok(mut data) => {
-                    *data = Some(user.clone());
-                    Self::set_logged_in_user_inside_localstorage(user, authorization_token)?;
+                    (*data).user = Some(user);
+                    (*data).authorization_token = Some(authorization_token.clone());
+                    LocalStorage::set(LocalStorageKey::Token, authorization_token)?;
                     break;
                 },
                 Err(_) => {
@@ -94,16 +98,18 @@ impl AuthorizationState {
             }
         }
 
+
         Ok(())
     }
 
     pub async fn remove_logged_in_user(&self) {
-        let accessor = self.user.clone();
+        let accessor = self.inner.clone();
 
         loop {
             match accessor.try_borrow_mut() {
                 Ok(mut data) => {
-                    *data = None;
+                    (*data).user = None;
+                    (*data).authorization_token = None;
                     Self::remove_logged_in_user_from_localstorage();
                 },
                 Err(_) => {
@@ -114,11 +120,11 @@ impl AuthorizationState {
     }
 
     pub async fn is_logged_in(&self) -> bool {
-        let accessor = self.token.clone();
+        let accessor = self.inner.clone();
 
         loop {
             match accessor.try_borrow() {
-                Ok(data) => return data.is_some(),
+                Ok(data) => return data.user.is_some() && data.authorization_token.is_some(),
                 Err(_) => {
                     TimeoutFuture::new(10).await;
                 }

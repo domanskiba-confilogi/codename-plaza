@@ -44,6 +44,7 @@ impl Component for RouteGuard {
                         Route::ReportProblem => is_logged_in,
                         Route::ReportOnboarding => is_logged_in,
                         Route::MyTickets => is_logged_in,
+                        Route::Logout => is_logged_in,
                         Route::NotFound => true
                     };
 
@@ -58,7 +59,7 @@ impl Component for RouteGuard {
         false
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html!{}
     }
 }

@@ -8,6 +8,8 @@ use crate::authorization_state::AuthorizationState;
 use crate::route_guard::RouteGuard;
 use connector::UserDto;
 use crate::api::{AuthorizedApiClient, TypicalFetchingError};
+use gloo_timers::future::TimeoutFuture;
+use crate::suspense_screen::SuspenseScreen;
 
 pub struct App {
     fetched_logged_in_user: bool,
@@ -21,6 +23,7 @@ pub enum Msg {
     FinishedFetchingUser {
         user: Option<UserDto>,
     },
+    ScheduledLoggedInUserUpdate(Option<UserDto>),
 }
 
 #[derive(Clone, PartialEq)]
@@ -42,7 +45,10 @@ impl Component for App {
 
                 AuthorizationState::emergency_clean();
 
-                gloo_utils::window().location().set_href("/");
+                if let Err(error) = gloo_utils::window().location().set_href("/") {
+                    log::error!("failed to redirect: {error:?}");
+                    panic!();
+                }
 
                 unreachable!();
             }
@@ -60,12 +66,13 @@ impl Component for App {
             state: state.clone(),
         };
 
-        me.fetch_user(ctx, state);
+        me.fetch_user(ctx, state.clone());
+        me.schedule_authorization_data_update(ctx, state);
 
         me
     }
 
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Self::Message::MobileNavbarToggle => {
                 self.mobile_navbar_show = !self.mobile_navbar_show;
@@ -75,6 +82,13 @@ impl Component for App {
                 self.logged_in_user = user;
                 self.fetched_logged_in_user = true;
                 true
+            }
+            Self::Message::ScheduledLoggedInUserUpdate(user) => {
+                let is_different = self.logged_in_user != user;
+
+                self.logged_in_user = user;
+
+                is_different
             }
         }
     }
@@ -88,16 +102,15 @@ impl Component for App {
                     <div class="min-h-screen w-full bg-neutral-950 text-neutral-100 flex flex-col">
                         { if !self.fetched_logged_in_user {
                             html! {
-                                <div class="w-full min-h-screen flex flex-col gap-4 justify-center items-center">
-                                    <ConfilogiIcon classes="w-28 z-10" />
-                                    <p class="animate-pulse select-none z-10">{"Pobieranie danych o użytkowniku..."}</p>
-                                </div>
+                                <SuspenseScreen
+                                    message="Pobieranie danych o użytkowniku"
+                                />
                             }
                         } else {
                             html! {
                                 <>
                                     <RouteGuard />
-                                    {self.render_header(ctx.clone())}
+                                    {self.render_header(ctx)}
                                     <Switch<Route> render={switch_routes} />
                                 </>
                             }
@@ -126,12 +139,16 @@ impl App {
                 .get_currently_logged_in_user()
                 .await {
                 Ok(user) => {
-                    app_state.authorization_state.set_logged_in_user(user.clone(), token).await;
+                    if let Err(error) = app_state.authorization_state.set_logged_in_user(user.clone(), token).await {
+                        app_state.fatal_error_state.report(error);
+                        return;
+                    }
+
                     scope.send_message(Msg::FinishedFetchingUser { user: Some(user) });
                 },
                 Err(error) => match error {
                     TypicalFetchingError::UnauthorizedError(_) => {
-                        app_state.authorization_state.remove_logged_in_user();
+                        app_state.authorization_state.remove_logged_in_user().await;
                         scope.send_message(Msg::FinishedFetchingUser { user: None });
                     }
                     _ => app_state.fatal_error_state.report(error),
@@ -166,6 +183,10 @@ impl App {
                                     {"Moje zgłoszenia"}
                                 </Link<Route>>
 
+                                <Link<Route> to={Route::Logout} classes="px-4 py-4 hover:bg-neutral-800">
+                                    {"Wyloguj"}
+                                </Link<Route>>
+
                                 <div class="flex flex-col text-end justify-center px-4">
                                     <span class="text-xs text-neutral-400">
                                         {"Zalogowany jako"}
@@ -177,7 +198,7 @@ impl App {
                     } else {
                         html! {
                             <Link<Route> to={Route::Home} classes="px-4 py-4 hover:bg-neutral-800">
-                            {"Zaloguj"}
+                                {"Zaloguj"}
                             </Link<Route>>
                         } 
                     } }
@@ -191,6 +212,10 @@ impl App {
 
                                 <Link<Route> to={Route::MyTickets} classes="px-4 py-3 bg-neutral-950 hover:bg-neutral-800 border-b border-b-neutral-800">
                                     {"Moje zgłoszenia"}
+                                </Link<Route>>
+
+                                <Link<Route> to={Route::Logout} classes="px-4 py-4 hover:bg-neutral-800">
+                                    {"Wyloguj"}
                                 </Link<Route>>
                             </>
                         }
@@ -208,6 +233,19 @@ impl App {
                 </button>
             </header>
         }
+    }
+
+    fn schedule_authorization_data_update(&self, ctx: &Context<Self>, state: AppState) {
+        let link = ctx.link().clone();
+        wasm_bindgen_futures::spawn_local(async move {
+
+            loop {
+                TimeoutFuture::new(250).await;
+
+                let logged_in_user = state.authorization_state.logged_in_user().await;
+                link.send_message(Msg::ScheduledLoggedInUserUpdate(logged_in_user));
+            }
+        })
     }
 }
 
@@ -227,6 +265,9 @@ pub enum Route {
 
     #[at("/my-tickets")]
     MyTickets,
+
+    #[at("/logout")]
+    Logout,
 
     #[not_found]
     #[at("/404")]
@@ -249,6 +290,9 @@ fn switch_routes(route: Route) -> Html {
         }
         Route::MyTickets => {
             html! { <MyTickets /> }
+        }
+        Route::Logout => {
+            html! { <Logout /> }
         }
         Route::NotFound => {
             html! { <PageNotFound /> }

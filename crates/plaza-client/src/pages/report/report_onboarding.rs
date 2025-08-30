@@ -19,7 +19,7 @@ impl Component for ReportOnboarding {
     type Message = ();
     type Properties = ReportOnboardingProperties;
 
-    fn create(ctx: &Context<Self>) -> Self {
+    fn create(_ctx: &Context<Self>) -> Self {
         Self {
             downloaded_company_sectors: None,
             downloaded_job_titles: None,
@@ -28,7 +28,7 @@ impl Component for ReportOnboarding {
         }
     }
 
-    fn view(&self, ctx: &Context<Self>) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <div class="w-full max-w-3xl p-4 flex flex-col gap-4">
                 <div class="w-full flex flex-col sm:flex-row gap-4">
