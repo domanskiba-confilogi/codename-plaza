@@ -142,7 +142,7 @@ async fn main() {
         .nest("/mailing-groups", mailing_groups_router)
         .with_state(db_pool);
 
-    let tcp_listener = TcpListener::bind("127.0.0.1:8081").await.unwrap();
+    let tcp_listener = TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
     axum::serve(tcp_listener, router).await.unwrap();
 }

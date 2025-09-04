@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-neutral-950">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Responsive Header Layout</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+		// Optional: tweak Tailwind defaults via CDN config
+		tailwind.config = {
+			theme: {
+				extend: {
+					colors: {
+						brand: {
+							yellow: '#FACC15', // yellow-400
+							blue: '#60A5FA',   // blue-400
+							black: '#0A0A0A'
+						}
+					}
+				}
+			}
+		}
+		</script>
+	</head>
+	<body class="h-full text-neutral-200 selection:bg-yellow-400 selection:text-black">
+		<!-- Header -->
+		<header class="sticky top-0 z-50 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<div class="flex h-16 items-center justify-between">
+					<!-- Logo -->
+					<a href="#" class="flex items-center gap-3 group">
+						<!-- Simple logomark (Y/B over black) -->
+						<span class="relative inline-grid h-9 w-9 place-items-center rounded-md bg-neutral-900 ring-1 ring-inset ring-neutral-800">
+							<span class="absolute inset-y-0 left-0 w-1/2 bg-yellow-400/90"></span>
+							<span class="absolute inset-y-0 right-0 w-1/2 bg-blue-500/70"></span>
+							<span class="relative h-5 w-5 rounded-sm bg-black/80 border border-neutral-800"></span>
+						</span>
+						<span class="text-lg font-semibold tracking-tight text-neutral-100">
+							Blackline
+							<span class="text-blue-400">Labs</span>
+						</span>
+					</a>
+
+					<!-- Desktop Nav -->
+					<nav class="hidden md:flex items-center gap-2">
+						<!-- Solutions (dropdown) -->
+						<div class="relative" data-dropdown>
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-neutral-300 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+								aria-expanded="false"
+								data-dropdown-toggle="dd-solutions"
+							>
+								Solutions
+								<svg class="h-4 w-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+									<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+								</svg>
+							</button>
+							<div
+								id="dd-solutions"
+								class="absolute right-0 mt-2 w-64 origin-top-right rounded-lg border border-neutral-800 bg-neutral-900/95 shadow-lg ring-1 ring-black/0 backdrop-blur hidden"
+								role="menu"
+								aria-label="Solutions submenu"
+							>
+								<div class="p-2">
+									<a href="#" class="flex items-start gap-3 rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none">
+										<span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded bg-blue-500/20 text-blue-400">A</span>
+										<span>
+											<span class="block font-medium">Analytics</span>
+											<span class="block text-xs text-neutral-400">Dashboards, insights, reporting</span>
+										</span>
+									</a>
+									<a href="#" class="flex items-start gap-3 rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none">
+										<span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded bg-yellow-400/20 text-yellow-400">⚙</span>
+										<span>
+											<span class="block font-medium">Automation</span>
+											<span class="block text-xs text-neutral-400">Workflows and scheduling</span>
+										</span>
+									</a>
+									<a href="#" class="flex items-start gap-3 rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 focus:bg-neutral-800 focus:outline-none">
+										<span class="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded bg-neutral-800 text-neutral-300">⇄</span>
+										<span>
+											<span class="block font-medium">Integrations</span>
+											<span class="block text-xs text-neutral-400">APIs and connectors</span>
+										</span>
+									</a>
+								</div>
+							</div>
+						</div>
+
+						<!-- Resources (dropdown) -->
+						<div class="relative" data-dropdown>
+							<button
+								type="button"
+								class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-neutral-300 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+								aria-expanded="false"
+								data-dropdown-toggle="dd-resources"
+							>
+								Resources
+								<svg class="h-4 w-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+									<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+								</svg>
+							</button>
+							<div
+								id="dd-resources"
+								class="absolute right-0 mt-2 w-56 origin-top-right rounded-lg border border-neutral-800 bg-neutral-900/95 shadow-lg backdrop-blur hidden"
+								role="menu"
+								aria-label="Resources submenu"
+							>
+								<div class="py-2">
+									<a href="#" class="block px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800">Blog</a>
+									<a href="#" class="block px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800">Docs</a>
+									<a href="#" class="block px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800">Tutorials</a>
+									<div class="my-2 border-t border-neutral-800"></div>
+									<a href="#" class="block px-4 py-2 text-sm text-blue-400 hover:bg-neutral-800">Changelog</a>
+								</div>
+							</div>
+						</div>
+
+						<!-- Simple links -->
+						<a href="#" class="rounded-md px-3 py-2 text-sm font-medium text-neutral-300 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400">Pricing</a>
+						<a href="#" class="rounded-md px-3 py-2 text-sm font-medium text-neutral-300 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400">About</a>
+
+						<!-- CTA -->
+						<a href="#"
+						class="ml-2 inline-flex items-center justify-center rounded-md bg-yellow-400 px-3 py-2 text-sm font-semibold text-black shadow-sm transition hover:bg-yellow-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400">
+						Contact
+					</a>
+					</nav>
+
+					<!-- Mobile menu button -->
+					<div class="md:hidden">
+						<button
+							type="button"
+							id="mobileMenuBtn"
+							class="inline-flex items-center justify-center rounded-md p-2 text-neutral-300 hover:bg-neutral-900 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+							aria-controls="mobileMenu"
+							aria-expanded="false"
+						>
+							<span class="sr-only">Open main menu</span>
+							<svg id="icon-menu" class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/>
+							</svg>
+							<svg id="icon-close" class="hidden h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+							</svg>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Mobile Nav -->
+			<div id="mobileMenu" class="md:hidden hidden border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
+				<div class="space-y-1 px-4 py-4">
+					<!-- Solutions (accordion) -->
+					<div class="rounded-lg border border-neutral-800">
+						<button
+							type="button"
+							class="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-200 hover:bg-neutral-900 focus:outline-none"
+							aria-expanded="false"
+							data-dropdown-toggle="mdd-solutions"
+						>
+							<span>Solutions</span>
+							<svg class="h-4 w-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+								<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+							</svg>
+						</button>
+						<div id="mdd-solutions" class="hidden px-2 pb-2">
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Analytics</a>
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Automation</a>
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Integrations</a>
+						</div>
+					</div>
+
+					<!-- Resources (accordion) -->
+					<div class="rounded-lg border border-neutral-800">
+						<button
+							type="button"
+							class="flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-200 hover:bg-neutral-900 focus:outline-none"
+							aria-expanded="false"
+							data-dropdown-toggle="mdd-resources"
+						>
+							<span>Resources</span>
+							<svg class="h-4 w-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+								<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+							</svg>
+						</button>
+						<div id="mdd-resources" class="hidden px-2 pb-2">
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Blog</a>
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Docs</a>
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900">Tutorials</a>
+							<a href="#" class="block rounded-md px-3 py-2 text-sm text-blue-400 hover:bg-neutral-900">Changelog</a>
+						</div>
+					</div>
+
+					<!-- Simple links -->
+					<a href="#" class="block rounded-md px-4 py-3 text-sm font-medium text-neutral-200 hover:bg-neutral-900">Pricing</a>
+					<a href="#" class="block rounded-md px-4 py-3 text-sm font-medium text-neutral-200 hover:bg-neutral-900">About</a>
+
+					<!-- CTA -->
+					<a href="#" class="block rounded-md bg-yellow-400 px-4 py-3 text-center text-sm font-semibold text-black hover:bg-yellow-300">Contact</a>
+				</div>
+			</div>
+		</header>
+
+		<!-- Main content (sample to show background) -->
+		<main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+			<section class="py-20">
+				<div class="max-w-3xl">
+					<h1 class="text-4xl font-semibold tracking-tight text-neutral-100 sm:text-5xl">
+						Build in black. Accented by blue and yellow.
+					</h1>
+					<p class="mt-4 text-neutral-400">
+						A sleek, responsive header with dropdowns using pure HTML, JS, and Tailwind via CDN. Designed to keep focus on deep blacks,
+						with subtle blue and bold yellow accents.
+					</p>
+					<div class="mt-8 flex gap-3">
+						<a href="#" class="inline-flex items-center rounded-md bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-400 ring-1 ring-inset ring-neutral-800 hover:bg-blue-500/25">
+							Get Started
+						</a>
+						<a href="#" class="inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold text-neutral-200 ring-1 ring-inset ring-neutral-800 hover:bg-neutral-900">
+							Learn More
+						</a>
+					</div>
+				</div>
+			</section>
+
+			<section class="grid gap-6 py-10 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="rounded-xl border border-neutral-800 bg-neutral-900/40 p-6">
+					<h3 class="font-semibold text-neutral-100">Dark-first UI</h3>
+					<p class="mt-2 text-sm text-neutral-400">Neutral-950 canvas with subtle depth and crisp contrast.</p>
+				</div>
+				<div class="rounded-xl border border-neutral-800 bg-neutral-900/40 p-6">
+					<h3 class="font-semibold text-neutral-100">Clean interactions</h3>
+					<p class="mt-2 text-sm text-neutral-400">Accessible toggles, ESC to close, and outside click handling.</p>
+				</div>
+				<div class="rounded-xl border border-neutral-800 bg-neutral-900/40 p-6">
+					<h3 class="font-semibold text-neutral-100">Brand accents</h3>
+					<p class="mt-2 text-sm text-neutral-400">Blue for links, yellow for CTAs, always anchored in black.</p>
+				</div>
+			</section>
+		</main>
+
+		<!-- Footer (simple) -->
+		<footer class="border-t border-neutral-800 py-10">
+			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<p class="text-sm text-neutral-500">© 2025 Blackline Labs. All rights reserved.</p>
+				<div class="flex gap-4">
+					<a href="#" class="text-sm text-neutral-400 hover:text-neutral-200">Privacy</a>
+					<a href="#" class="text-sm text-neutral-400 hover:text-neutral-200">Terms</a>
+					<a href="#" class="text-sm text-neutral-400 hover:text-neutral-200">Contact</a>
+				</div>
+			</div>
+		</footer>
+
+		<!-- JS: menus and dropdowns -->
+		<script>
+		// Utility to close all dropdown menus
+		function closeAllDropdowns(exceptId) {
+			document.querySelectorAll('[id^="dd-"], [id^="mdd-"]').forEach(menu => {
+				if (exceptId && menu.id === exceptId) return;
+				menu.classList.add('hidden');
+				// Update buttons' aria-expanded
+				const btn = document.querySelector('[data-dropdown-toggle="' + menu.id + '"]');
+				if (btn) btn.setAttribute('aria-expanded', 'false');
+			});
+		}
+
+		// Desktop & Mobile dropdown toggles (event delegation)
+		document.addEventListener('click', (e) => {
+			const toggleBtn = e.target.closest('[data-dropdown-toggle]');
+			const isInsideDropdown = e.target.closest('[data-dropdown]');
+			const menuId = toggleBtn ? toggleBtn.getAttribute('data-dropdown-toggle') : null;
+
+			if (toggleBtn && menuId) {
+				const menu = document.getElementById(menuId);
+				const isHidden = menu.classList.contains('hidden');
+				// Close others then toggle current
+				closeAllDropdowns(isHidden ? menuId : null);
+				menu.classList.toggle('hidden', !isHidden);
+				toggleBtn.setAttribute('aria-expanded', String(isHidden));
+				return;
+			}
+
+			// If clicking outside any dropdown container, close all
+			if (!isInsideDropdown && !e.target.closest('#mobileMenu')) {
+				closeAllDropdowns();
+			}
+		});
+
+		// Escape key closes dropdowns and mobile menu
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				closeAllDropdowns();
+				const mobileMenu = document.getElementById('mobileMenu');
+				const mobileBtn = document.getElementById('mobileMenuBtn');
+				if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+					mobileMenu.classList.add('hidden');
+					mobileBtn.setAttribute('aria-expanded', 'false');
+					document.getElementById('icon-menu').classList.remove('hidden');
+					document.getElementById('icon-close').classList.add('hidden');
+				}
+			}
+		});
+
+		// Mobile menu toggle
+		const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+		const mobileMenu = document.getElementById('mobileMenu');
+		const iconMenu = document.getElementById('icon-menu');
+		const iconClose = document.getElementById('icon-close');
+
+		mobileMenuBtn.addEventListener('click', () => {
+			const isOpen = !mobileMenu.classList.contains('hidden');
+			if (isOpen) {
+				mobileMenu.classList.add('hidden');
+				mobileMenuBtn.setAttribute('aria-expanded', 'false');
+				iconMenu.classList.remove('hidden');
+				iconClose.classList.add('hidden');
+				closeAllDropdowns(); // also close any open mobile accordions
+			} else {
+				mobileMenu.classList.remove('hidden');
+				mobileMenuBtn.setAttribute('aria-expanded', 'true');
+				iconMenu.classList.add('hidden');
+				iconClose.classList.remove('hidden');
+			}
+		});
+		</script>
+	</body>
+</html>

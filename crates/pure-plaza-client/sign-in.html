@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Login</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Tailwind CSS (CDN) -->
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<!-- Navbar -->
+		<div id="navbar-root"></div>
+
+		<!-- Main -->
+		<main class="flex-1 flex items-center justify-center px-4 py-12">
+			<div class="w-full max-w-md">
+				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 shadow-lg">
+					<h1 class="text-xl font-semibold mb-6">Sign in</h1>
+
+					<!-- Email -->
+					<div id="email-field" class="mb-4"></div>
+					<!-- Password -->
+					<div id="password-field" class="mb-6"></div>
+
+					<div class="flex items-center justify-between mb-4">
+						<!-- Forgot Password -->
+						<div id="forgot-btn"></div>
+						<!-- Spacer -->
+						<div class="flex-1"></div>
+						<!-- Submit -->
+						<div id="submit-btn"></div>
+					</div>
+
+				</div>
+			</div>
+		</main>
+
+		<script src="./main.js"></script>
+		<script src="./components/navbar/main.js"></script>
+		<script src="./components/text_field/main.js"></script>
+		<script src="./components/button/main.js"></script>
+
+		<script>
+		const navbar = mountNavbar('#navbar-root', {
+			brandHref: '/',
+			brandName: 'Confilogi',
+			brandAccent: 'IT Support',
+			...LOGGED_OUT_NAVBAR_ARGS
+		});
+
+		// 2) Form fields (TextField supports 'email' and 'password' types) <source_id data="1" title="documentation.md" />
+		const emailField = mountTextField('#email-field', {
+			label: 'Email',
+			type: 'email',
+			placeholder: 'name@domain.com',
+			value: '',
+			clearErrorOnInput: true,
+			onInput: ({ new_value }) => {
+				// Optional: live validation hook
+			}
+		});
+
+		const passwordField = mountTextField('#password-field', {
+			label: 'Password',
+			type: 'password',
+			placeholder: 'Enter your password',
+			value: '',
+			clearErrorOnInput: true,
+		});
+
+		const forgotBtn = mountButton('#forgot-btn', {
+			label: 'Forgot password?',
+			variant: 'ghost',
+			size: 'sm',
+			href: '/forgot-your-password.html'
+		});
+
+		// Submit button: render as <button type="submit"> <source_id data="1" title="documentation.md" />
+		const submitBtn = mountButton('#submit-btn', {
+			label: 'Sign in',
+			variant: 'primary',
+			size: 'md',
+			type: 'submit', // applies when rendered as <button> <source_id data="1" title="documentation.md" />
+			onClick: (e) => {
+				e.preventDefault();
+				sendLoginRequest();
+			}
+		});
+
+		async function sendLoginRequest() {
+			const email = emailField.getValue();
+			const password = passwordField.getValue();
+
+			// Build payload
+			const payload = {
+				email,
+				password
+			};
+
+			const apiConnector= createApiConnector();
+
+			const result = await apiConnector.login({
+				email,
+				password
+			});
+
+			if (result.ok !== null) {
+				console.log(result.ok);
+			} else if (result.validationError !== null) {
+				let {
+					message, property_name: propertyName
+				} = result.validationError;
+
+				propertyName = propertyName.toLowerCase();
+
+				if (propertyName === "email") {
+					emailField.setError(message);
+				} else {
+					passwordField.setError(message);
+				}
+			} else {
+				console.log(result.unknownError);
+			}
+		}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Przykład użycia mountSuspenseScreen (Tailwind + Pure JS)</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+		<header class="mb-8">
+			<h1 class="text-2xl font-semibold">Przykład komponentu SuspenseScreen</h1>
+			<p class="text-neutral-400">
+				Pure JS + TailwindCSS. Poniżej dwie instancje przedstawiające kontrolę widoczności, zmianę treści i ikon oraz symulację ładowania.
+			</p>
+		</header>
+
+		<main class="flex flex-col lg:flex-row gap-10">
+			<!-- Instancja 1: Podstawowa kontrola API -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 1</h2>
+				<div id="suspense1"></div>
+
+				<div class="flex flex-wrap gap-3">
+					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż</button>
+					<button id="hide1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ukryj</button>
+					<button id="msg1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień komunikat</button>
+					<button id="hint1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień hint</button>
+					<button id="icon1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień ikonę</button>
+					<button id="destroy1" class="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-600">Zniszcz</button>
+					<button id="recreate1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Odtwórz</button>
+				</div>
+			</section>
+
+			<!-- Instancja 2: Symulacja ładowania i przełączanie na treść -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 2 (symulacja ładowania)</h2>
+				<div id="suspense2"></div>
+
+				<div id="content2" class="hidden rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+					<h3 class="text-xl font-semibold mb-2">Dane zostały załadowane</h3>
+					<p class="text-neutral-300">To jest przykładowa sekcja treści wyświetlana po zakończonym ładowaniu.</p>
+				</div>
+
+				<div class="flex flex-wrap gap-3">
+					<button id="simulate2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Symuluj ładowanie (2.5s)</button>
+					<button id="reset2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Resetuj (pokaż loader)</button>
+					<button id="done2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Pokaż treść</button>
+				</div>
+			</section>
+		</main>
+
+		<!-- Uwaga: ./main.js powinien eksportować funkcję mountSuspenseScreen -->
+		<script src="../../main.js"></script>
+		<script src="./main.js"></script>
+		<script>
+		// Prosty alternatywny SVG (ikona błyskawicy)
+		const ALT_ICON_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+class="w-full h-auto text-yellow-400" fill="currentColor">
+<path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/>
+</svg>
+`;
+
+		if (typeof mountSuspenseScreen !== 'function') {
+			console.error('mountSuspenseScreen nie jest dostępny. Upewnij się, że ./main.js go eksportuje.');
+		}
+
+		// Instancja 1
+		let api1 = mountSuspenseScreen('#suspense1', {
+			message: 'Wczytywanie widoku...',
+			hint: 'To może potrwać kilka sekund',
+		});
+
+		let iconToggle1 = false;
+
+		document.getElementById('show1').addEventListener('click', () => api1.show());
+		document.getElementById('hide1').addEventListener('click', () => api1.hide());
+
+		document.getElementById('msg1').addEventListener('click', () => {
+			const val = prompt('Nowy komunikat:', 'Przygotowujemy środowisko…');
+			if (val !== null) api1.setMessage(val);
+		});
+
+		document.getElementById('hint1').addEventListener('click', () => {
+			const val = prompt('Nowy hint (puste aby usunąć):', 'Optymalizujemy zasoby…');
+			if (val === null) return;
+			if (val.trim() === '') api1.setHint(null);
+				else api1.setHint(val);
+		});
+
+		document.getElementById('icon1').addEventListener('click', () => {
+			iconToggle1 = !iconToggle1;
+			api1.setIconSvg(iconToggle1 ? ALT_ICON_SVG : CONFILOGI_ICON_SVG); // null -> domyślny spinner z main.js
+		});
+
+		document.getElementById('destroy1').addEventListener('click', () => {
+			api1.destroy();
+		});
+
+		document.getElementById('recreate1').addEventListener('click', () => {
+			api1 = mountSuspenseScreen('#suspense1', {
+				message: 'Loader odtworzony',
+				hint: 'Komponent został zamontowany ponownie',
+			});
+			iconToggle1 = false;
+		});
+
+		// Instancja 2: symulacja ładowania i przełączenie na treść
+		const content2 = document.getElementById('content2');
+		const showContent2 = () => {
+			content2.classList.remove("hidden");
+			api2.hide();
+		};
+		const showLoader2 = () => {
+			content2.classList.add("hidden");
+			api2.show();
+		};
+
+		const api2 = mountSuspenseScreen('#suspense2', {
+			message: 'Ładujemy dane raportu…',
+		});
+
+		document.getElementById('simulate2').addEventListener('click', () => {
+			showLoader2();
+			setTimeout(() => {
+				showContent2();
+			}, 2500);
+		});
+
+		document.getElementById('reset2').addEventListener('click', () => {
+			api2.setMessage('Ponowne ładowanie…');
+			api2.setHint('Proszę czekać');
+			showLoader2();
+		});
+
+		document.getElementById('done2').addEventListener('click', () => {
+			api2.setHint('Gotowe');
+			showContent2();
+		});
+
+		// Startowo pokaż loader dla instancji 2 (schowana treść)
+		showLoader2();
+		</script>
+	</body>
+</html>

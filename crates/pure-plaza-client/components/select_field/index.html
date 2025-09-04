@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Przykład użycia mountSelectField (Tailwind + Pure JS)</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+		<header class="mb-8">
+			<h1 class="text-2xl font-semibold">Przykład komponentu SelectField</h1>
+			<p class="text-neutral-400">Pure JS + TailwindCSS. Poniżej dwie instancje komponentu.</p>
+		</header>
+
+		<main class="flex flex-col lg:flex-row gap-10">
+			<!-- Instancja 1 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 1</h2>
+				<div id="select1"></div>
+				<div class="flex gap-3">
+					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
+					<button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+					<button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					<button id="swap1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Podmień dane</button>
+				</div>
+			</section>
+
+			<!-- Instancja 2 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 2</h2>
+				<div id="select2"></div>
+				<div class="flex gap-3">
+					<button id="show2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
+					<button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+					<button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+				</div>
+			</section>
+
+		</main>
+		<script src="./main.js"></script>
+		<script>
+// Dane przykładowe
+const fruits = [
+{ value: 1, display_text: 'Jabłko' },
+{ value: 2, display_text: 'Banany' },
+{ value: 3, display_text: 'Czereśnie' },
+{ value: 4, display_text: 'Daktyle' },
+{ value: 5, display_text: 'Elderberry' },
+{ value: 6, display_text: 'Figa' },
+{ value: 7, display_text: 'Winogrona' },
+{ value: 8, display_text: 'Gruszka' },
+];
+
+const cities = [
+{ value: 101, display_text: 'Warszawa' },
+{ value: 102, display_text: 'Kraków' },
+{ value: 103, display_text: 'Gdańsk' },
+{ value: 104, display_text: 'Wrocław' },
+{ value: 105, display_text: 'Poznań' },
+];
+
+// Montowanie instancji
+const api1 = mountSelectField('#select1', fruits, {
+	label: 'Wybierz owoce',
+	placeholder: 'Szukaj owoców...',
+});
+
+const api2 = mountSelectField('#select2', cities, {
+	label: 'Wybierz miasto',
+	placeholder: 'Szukaj miasta...',
+});
+
+// Obsługa przycisków (instancja 1)
+document.getElementById('show1').addEventListener('click', () => {
+	alert('Wybrane wartości (instancja 1): ' + JSON.stringify(api1.getChosen()));
+});
+document.getElementById('clear1').addEventListener('click', () => {
+	api1.clear();
+});
+document.getElementById('focus1').addEventListener('click', () => {
+	api1.focus();
+});
+document.getElementById('swap1').addEventListener('click', () => {
+	const tropical = [
+		{ value: 201, display_text: 'Mango' },
+		{ value: 202, display_text: 'Ananas' },
+		{ value: 203, display_text: 'Papaja' },
+		{ value: 204, display_text: 'Marakuja' },
+	];
+	api1.setItems(tropical);
+});
+
+// Obsługa przycisków (instancja 2)
+document.getElementById('show2').addEventListener('click', () => {
+	alert('Wybrane wartości (instancja 2): ' + JSON.stringify(api2.getChosen()));
+});
+document.getElementById('clear2').addEventListener('click', () => {
+	api2.clear();
+});
+document.getElementById('focus2').addEventListener('click', () => {
+	api2.focus();
+});
+		</script>
+	</body>
+</html>
+

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Przykład użycia mountTextField (Tailwind + Pure JS)</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+		<header class="mb-8">
+			<h1 class="text-2xl font-semibold">Przykład komponentu TextField</h1>
+			<p class="text-neutral-400">Pure JS + TailwindCSS. Poniżej dwie instancje komponentu.</p>
+		</header>
+
+		<main class="flex flex-col lg:flex-row gap-10">
+			<!-- Instancja 1 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 1</h2>
+
+				<div id="tf1"></div>
+
+				<div class="text-sm text-neutral-400">
+					<div>Live onInput: <span id="live1" class="text-neutral-200"></span></div>
+					<div>Typ: <span id="type1" class="text-neutral-200"></span> | Disabled: <span id="disabled1" class="text-neutral-200"></span></div>
+				</div>
+
+				<div class="flex flex-wrap gap-3">
+					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wartość</button>
+					<button id="set1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw wartość "Ala ma kota"</button>
+					<button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+					<button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					<button id="toggleDisabled1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Przełącz disabled</button>
+					<button id="cycleType1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ (text → password → email)</button>
+					<button id="setLabel1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw etykietę</button>
+					<button id="setPlaceholder1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw placeholder</button>
+				</div>
+			</section>
+
+			<!-- Instancja 2 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 2</h2>
+
+				<div id="tf2"></div>
+
+				<div class="text-sm text-neutral-400">
+					<div>Live onInput: <span id="live2" class="text-neutral-200"></span></div>
+					<div>Typ: <span id="type2" class="text-neutral-200"></span> | Disabled: <span id="disabled2" class="text-neutral-200"></span></div>
+				</div>
+
+				<div class="flex flex-wrap gap-3">
+					<button id="show2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wartość</button>
+					<button id="set2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw "jan@kowalski.dev"</button>
+					<button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+					<button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					<button id="toPassword2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ na password</button>
+					<button id="toEmail2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ na email</button>
+				</div>
+			</section>
+		</main>
+
+		<!-- Udostępnia mountTextField -->
+		<script src="./main.js"></script>
+
+		<script src="../../main.js"></script>
+
+		<script>
+		// Montowanie instancji
+		const api1 = mountTextField('#tf1', {
+			type: 'text',
+			label: 'Imię i nazwisko',
+			placeholder: 'Wpisz tekst...',
+			value: '',
+			onInput: (e) => updateLive(1, e.new_value),
+		});
+
+		const api2 = mountTextField('#tf2', {
+			type: 'email',
+			label: 'Adres e-mail',
+			placeholder: 'name@example.com',
+			value: '',
+			onInput: (e) => updateLive(2, e.new_value),
+		});
+
+		// Pomocnicze: aktualizacja live i metadanych
+		function updateLive(n, val) {
+			document.getElementById('live' + n).textContent = val ?? '';
+			refreshMeta(n);
+		}
+
+		function refreshMeta(n) {
+			const api = n === 1 ? api1 : api2;
+			document.getElementById('type' + n).textContent = api.getType();
+			document.getElementById('disabled' + n).textContent = api.isDisabled() ? 'tak' : 'nie';
+		}
+
+		// Inicjalna aktualizacja meta
+		refreshMeta(1);
+		refreshMeta(2);
+
+		// Obsługa przycisków (instancja 1)
+		document.getElementById('show1').addEventListener('click', () => {
+			alert('Wartość (instancja 1): ' + JSON.stringify(api1.getValue()));
+		});
+		document.getElementById('set1').addEventListener('click', () => {
+			api1.setValue('Ala ma kota');
+			refreshMeta(1);
+		});
+		document.getElementById('clear1').addEventListener('click', () => {
+			api1.clear();
+			refreshMeta(1);
+		});
+		document.getElementById('focus1').addEventListener('click', () => {
+			api1.focus();
+		});
+		document.getElementById('toggleDisabled1').addEventListener('click', () => {
+			api1.isDisabled() ? api1.enable() : api1.disable();
+			refreshMeta(1);
+		});
+		document.getElementById('cycleType1').addEventListener('click', () => {
+			const order = ['text', 'password', 'email'];
+			const cur = api1.getType();
+			const next = order[(order.indexOf(cur) + 1) % order.length];
+			api1.setType(next);
+			refreshMeta(1);
+		});
+		document.getElementById('setLabel1').addEventListener('click', () => {
+			const next = prompt('Podaj nową etykietę:', 'Imię i nazwisko (zmienione)');
+			if (next !== null) api1.setLabel(next);
+		});
+		document.getElementById('setPlaceholder1').addEventListener('click', () => {
+			const next = prompt('Podaj nowy placeholder:', 'np. Jan Kowalski');
+			if (next !== null) api1.setPlaceholder(next);
+		});
+
+		// Obsługa przycisków (instancja 2)
+		document.getElementById('show2').addEventListener('click', () => {
+			alert('Wartość (instancja 2): ' + JSON.stringify(api2.getValue()));
+		});
+		document.getElementById('set2').addEventListener('click', () => {
+			api2.setValue('jan@kowalski.dev');
+			refreshMeta(2);
+		});
+		document.getElementById('clear2').addEventListener('click', () => {
+			api2.clear();
+			refreshMeta(2);
+		});
+		document.getElementById('focus2').addEventListener('click', () => {
+			api2.focus();
+		});
+		document.getElementById('toPassword2').addEventListener('click', () => {
+			api2.setType('password');
+			refreshMeta(2);
+		});
+		document.getElementById('toEmail2').addEventListener('click', () => {
+			api2.setType('email');
+			refreshMeta(2);
+		});
+		</script>
+	</body>
+</html>

@@ -148,7 +148,6 @@ pub mod i18n {
     }
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
-    #[serde(tag = "type", content = "data")]
     pub enum FieldTranslationKey {
         Email,
         Password,
@@ -193,12 +192,12 @@ pub mod i18n {
             match self {
                 ValidationTranslationKey::StringTooShort { property_name, min_length } => {
                     match language {
-                        Language::Polish => format!("Pole \"{}\" jest za krótkie, minimum {min_length} znaki.", property_name.translate(language)),
+                        Language::Polish => format!("Pole \"{}\" jest za krótkie, minimum {min_length} znaków.", property_name.translate(language)),
                     }
                 },
                 ValidationTranslationKey::StringTooLong { property_name, max_length } => {
                     match language {
-                        Language::Polish => format!("Pole \"{}\" jest za długi, maksimum {max_length} znaki.", property_name.translate(language)),
+                        Language::Polish => format!("Pole \"{}\" jest za długi, maksimum {max_length} znaków.", property_name.translate(language)),
                     }
                 }
                 ValidationTranslationKey::InvalidEmail { property_name } => {
