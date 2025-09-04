@@ -10,11 +10,13 @@
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
 		<div id="error-modal-root"></div>
 
+		<div id="loading-screen"></div>
+
 		<!-- Navbar -->
-		<div id="navbar-root"></div>
+		<div data-loading="show" class="hidden" id="navbar-root"></div>
 
 		<!-- Main -->
-		<main class="flex-1">
+		<main data-loading="show" class="flex-1 hidden">
 			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
 				<!-- Page header -->
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -37,8 +39,11 @@
 							<div id="second-name-field"></div>
 							<div id="last-name-field"></div>
 						</div>
-						
-						<div id="job-title-field"></div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div id="company-department-field"></div>
+							<div id="job-title-field"></div>
+						</div>
 					</section>
 
 					<!-- Previous employment -->
@@ -68,21 +73,24 @@
 							<div id="email-field"></div>
 						</div>
 					</section>
-
-					<!-- Actions -->
-					<div class="flex items-center justify-end gap-3">
-						<div id="cancel-btn"></div>
-						<div id="submit-btn"></div>
-					</div>
 				</form>
 
-				<form id="permissions-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg">
+				<form id="permissions-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-8">
 					<!-- Basic data -->
 					<section class="mb-8">
 						<h2 class="text-lg font-semibold mb-4">Requested permissions</h2>
-						<div id="permissions-field"></div>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div id="master-systems-field"></div>
+							<div id="licenses-field"></div>
+						</div>
 					</section>
 				</form>
+
+				<!-- Actions -->
+				<div class="flex items-center justify-end gap-3">
+					<div id="cancel-btn"></div>
+					<div id="submit-btn"></div>
+				</div>
 			</section>
 		</main>
 
@@ -93,270 +101,318 @@
 		<script src="/components/modal/main.js"></script>
 		<script src="/components/button/main.js"></script>
 		<script src="/components/checkbox_field/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
 
 		<script>
-		// Navbar
-		const navbar = mountNavbar('#navbar-root', {
-			brandHref: '/',
-			brandName: 'Confilogi',
-			brandAccent: 'IT Support',
-			...LOGGED_IN_NAVBAR_ARGS
+		const authStore = createAuthStore();
+
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
 		});
 
-		// Safe text helper for modal HTML content
-		function escapeHtml(str) {
-			return String(str).replace(/[&<>"']/g, s => ({
-				'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-			}[s]));
-		}
+		const apiConnector = createApiConnector();
 
-		// Fields
-		const firstNameField = mountTextField('#first-name-field', {
-			label: 'Name',
-			type: 'text',
-			placeholder: 'Enter name...',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const secondNameField = mountTextField('#second-name-field', {
-			label: 'Second name (optional)',
-			type: 'text',
-			placeholder: 'Enter second name...',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const lastNameField = mountTextField('#last-name-field', {
-			label: 'Surname',
-			type: 'text',
-			placeholder: 'Enter surname...',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const jobTitleField = mountSelectField('#job-title-field', [
+		(async () => {
+			await checkIsLoggedInMiddleware(authStore);
 
-		], {
-			label: 'Job title',
-			type: 'text',
-			placeholder: 'Select job title...',
-			clearErrorOnInput: true,
-		});
+			const jobTitles = await apiConnector.getJobTitles();
+			const companyDepartments = await apiConnector.getCompanyDepartments();
 
-		const workedBeforeSwitch = mountCheckbox("#worked-before-switch", { label: "" });
+			// TODO: Error handling for both
 
-		const streetField = mountTextField('#street-field', {
-			label: 'Street name',
-			type: 'text',
-			placeholder: 'e.g., Main Street',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const houseNumberField = mountTextField('#house-number-field', {
-			label: 'House number',
-			type: 'text',
-			placeholder: 'e.g., 12A',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const apartmentNumberField = mountTextField('#apartment-number-field', {
-			label: 'Apartment number (optional)',
-			type: 'text',
-			placeholder: 'e.g., 5',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const countryField = mountTextField('#country-field', {
-			label: 'Country',
-			type: 'text',
-			placeholder: 'e.g., Poland',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const cityField = mountTextField('#city-field', {
-			label: 'City',
-			type: 'text',
-			placeholder: 'e.g., Warsaw',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const postalCodeField = mountTextField('#postal-code-field', {
-			label: 'Postal code',
-			type: 'text',
-			placeholder: 'e.g., 00-001',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const phoneField = mountTextField('#phone-field', {
-			label: 'Cellphone number',
-			type: 'text',
-			placeholder: 'e.g., +48 600 000 000',
-			value: '',
-			clearErrorOnInput: true,
-		});
-		const emailField = mountTextField('#email-field', {
-			label: 'Email address',
-			type: 'email',
-			placeholder: 'name@domain.com',
-			value: '',
-			clearErrorOnInput: true,
-		});
+			console.log(jobTitles);
+			console.log(companyDepartments);
 
-		// Actions
-		const cancelBtn = mountButton('#cancel-btn', {
-			label: 'Cancel',
-			variant: 'ghost',
-			size: 'sm',
-			onClick: () => {
-				// Navigate back or to a default page
-				if (document.referrer) history.back();
-					else window.location.href = '/reported-problems.html';
+			loadingScreen.destroy();
+
+			Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(element => {
+				element.classList.remove("hidden");
+			});
+
+			// Navbar
+			const navbar = mountNavbar('#navbar-root', {
+				brandHref: '/',
+				brandName: 'Confilogi',
+				brandAccent: 'IT Support',
+				...LOGGED_IN_NAVBAR_ARGS
+			});
+
+			// Safe text helper for modal HTML content
+			function escapeHtml(str) {
+				return String(str).replace(/[&<>"']/g, s => ({
+					'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+				}[s]));
 			}
-		});
-		// Submit button: render as <button type="submit">
-		const submitBtn = mountButton('#submit-btn', {
-			label: 'Go to next step',
-			variant: 'primary',
-			size: 'md',
-			type: 'submit', // applies when rendered as <button>
-		});
 
-		const permissionsField = mountSelectField("#permissions-field", [
-			{ value: "vici-pl", displayText: "Vici PL" },
-			{ value: "vici-cz", displayText: "Vici CZ" },
-			{ value: "vici-sk", displayText: "Vici SK" },
-			{ value: "vici-bg", displayText: "Vici BG" },
-			{ value: "vici-si", displayText: "Vici SI" },
-			{ value: "vici-hr", displayText: "Vici HR" },
+			// Fields
+			const firstNameField = mountTextField('#first-name-field', {
+				label: 'Name',
+				type: 'text',
+				placeholder: 'Enter name...',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const secondNameField = mountTextField('#second-name-field', {
+				label: 'Second name (optional)',
+				type: 'text',
+				placeholder: 'Enter second name...',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const lastNameField = mountTextField('#last-name-field', {
+				label: 'Surname',
+				type: 'text',
+				placeholder: 'Enter surname...',
+				value: '',
+				clearErrorOnInput: true,
+			});
 
-			{ value: "crm-pl", displayText: "CRM PL" },
-			{ value: "crm-cz", displayText: "CRM CZ" },
-			{ value: "crm-sk", displayText: "CRM SK" },
-			{ value: "crm-bg", displayText: "CRM BG" },
-			{ value: "crm-si", displayText: "CRM SI" },
-			{ value: "crm-hr", displayText: "CRM HR" },
+			const companyDepartmentField = mountSelectField('#company-department-field', [
 
-			{ value: "optima", displayText: "Optima" },
-		], {
-			label: "Requested master systems",
-			placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
-		});
+			], {
+				label: 'Company department',
+				type: 'text',
+				placeholder: 'Select company department...',
+				clearErrorOnInput: true,
+			});
 
-		// Validation helpers
-		function clearAllErrors() {
-			[firstNameField, lastNameField, streetField, houseNumberField, countryField,
-				cityField, postalCodeField, phoneField, emailField].forEach(f => f.clearError());
-		}
+			const jobTitleField = mountSelectField('#job-title-field', [
 
-		async function submitOnboarding(e) {
-			e.preventDefault();
-			clearAllErrors();
+			], {
+				label: 'Job title',
+				type: 'text',
+				placeholder: 'Select job title...',
+				clearErrorOnInput: true,
+			});
 
-			// Gather
-			const payload = {
-				person: {
-					name: firstNameField.getValue().trim(),
-					secondName: secondNameField.getValue().trim(),
-					surname: lastNameField.getValue().trim(),
-					workedWithUsBefore: workedBeforeSwitch.getValue(),
-				},
-				address: {
-					street: streetField.getValue().trim(),
-					houseNumber: houseNumberField.getValue().trim(),
-					apartmentNumber: apartmentNumberField.getValue().trim(),
-					country: countryField.getValue().trim(),
-					city: cityField.getValue().trim(),
-					postalCode: postalCodeField.getValue().trim(),
-				},
-				contact: {
-					cellphone: phoneField.getValue().trim(),
-					email: emailField.getValue().trim(),
+			const workedBeforeSwitch = mountCheckbox("#worked-before-switch", { label: "" });
+
+			const streetField = mountTextField('#street-field', {
+				label: 'Street name',
+				type: 'text',
+				placeholder: 'e.g., Main Street',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const houseNumberField = mountTextField('#house-number-field', {
+				label: 'House number',
+				type: 'text',
+				placeholder: 'e.g., 12A',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const apartmentNumberField = mountTextField('#apartment-number-field', {
+				label: 'Apartment number (optional)',
+				type: 'text',
+				placeholder: 'e.g., 5',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const countryField = mountTextField('#country-field', {
+				label: 'Country',
+				type: 'text',
+				placeholder: 'e.g., Poland',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const cityField = mountTextField('#city-field', {
+				label: 'City',
+				type: 'text',
+				placeholder: 'e.g., Warsaw',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const postalCodeField = mountTextField('#postal-code-field', {
+				label: 'Postal code',
+				type: 'text',
+				placeholder: 'e.g., 00-001',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const phoneField = mountTextField('#phone-field', {
+				label: 'Cellphone number',
+				type: 'text',
+				placeholder: 'e.g., +48 600 000 000',
+				value: '',
+				clearErrorOnInput: true,
+			});
+			const emailField = mountTextField('#email-field', {
+				label: 'Email address',
+				type: 'email',
+				placeholder: 'name@domain.com',
+				value: '',
+				clearErrorOnInput: true,
+			});
+
+			const requestedMasterSystemsField = mountSelectField("#master-systems-field", [
+				{ value: "vici-pl", displayText: "Vici PL" },
+				{ value: "vici-cz", displayText: "Vici CZ" },
+				{ value: "vici-sk", displayText: "Vici SK" },
+				{ value: "vici-bg", displayText: "Vici BG" },
+				{ value: "vici-si", displayText: "Vici SI" },
+				{ value: "vici-hr", displayText: "Vici HR" },
+
+				{ value: "crm-pl", displayText: "CRM PL" },
+				{ value: "crm-cz", displayText: "CRM CZ" },
+				{ value: "crm-sk", displayText: "CRM SK" },
+				{ value: "crm-bg", displayText: "CRM BG" },
+				{ value: "crm-si", displayText: "CRM SI" },
+				{ value: "crm-hr", displayText: "CRM HR" },
+
+				{ value: "optima", displayText: "Optima" },
+
+				{ value: "nettel-replica-pl", displayText: "Database replication of Vici PL" },
+				{ value: "nettel-replica-eu", displayText: "Database replication of Vici CZ/SK/BG/SI" },
+				{ value: "ovh-replica", displayText: "Database replication of Vici HR" },
+			], {
+					label: "Master systems",
+					placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
+				});
+
+			const requestedLicensesField = mountSelectField("#licenses-field", [
+				{ value: "office-on-web", displayText: "Office on Web" },
+				{ value: "office-on-desktop", displayText: "Office on Desktop" },
+				{ value: "powerbi-pro", displayText: "PowerBI Pro" },
+				{ value: "powerbi-premium", displayText: "PowerBI Premium" },
+			], {
+					label: "Licenses",
+					placeholder: "Office on desktop, PowerBI Pro, etc.",
+				});
+
+			// Actions
+			const cancelBtn = mountButton('#cancel-btn', {
+				label: 'Cancel',
+				variant: 'ghost',
+				size: 'sm',
+				onClick: () => {
+					window.location.href = '/report-problem.html';
 				}
-			};
+			});
+			// Submit button: render as <button type="submit">
+			const submitBtn = mountButton('#submit-btn', {
+				label: 'Go to next step',
+				variant: 'primary',
+				size: 'md',
+				type: 'submit', // applies when rendered as <button>
+			});
 
-			// Validate
-			let hasError = false;
-			if (isEmpty(payload.person.name)) { firstNameField.setError('Name is required'); hasError = true; }
-			if (isEmpty(payload.person.surname)) { lastNameField.setError('Surname is required'); hasError = true; }
+			// Validation helpers
+			function clearAllErrors() {
+				[firstNameField, lastNameField, streetField, houseNumberField, countryField,
+					cityField, postalCodeField, phoneField, emailField].forEach(f => f.clearError());
+			}
 
-			if (isEmpty(payload.address.street)) { streetField.setError('Street is required'); hasError = true; }
-			if (isEmpty(payload.address.houseNumber)) { houseNumberField.setError('House number is required'); hasError = true; }
-			if (isEmpty(payload.address.country)) { countryField.setError('Country is required'); hasError = true; }
-			if (isEmpty(payload.address.city)) { cityField.setError('City is required'); hasError = true; }
-			if (isEmpty(payload.address.postalCode)) { postalCodeField.setError('Postal code is required'); hasError = true; }
-			else if (!validatePostal(payload.address.postalCode)) { postalCodeField.setError('Enter a valid postal code'); hasError = true; }
+			async function submitOnboarding(e) {
+				e.preventDefault();
+				clearAllErrors();
 
-			if (isEmpty(payload.contact.cellphone)) { phoneField.setError('Cellphone number is required'); hasError = true; }
-			else if (!validatePhone(payload.contact.cellphone)) { phoneField.setError('Enter a valid phone number'); hasError = true; }
+				// Gather
+				const payload = {
+					person: {
+						name: firstNameField.getValue().trim(),
+						secondName: secondNameField.getValue().trim(),
+						surname: lastNameField.getValue().trim(),
+						workedWithUsBefore: workedBeforeSwitch.getValue(),
+					},
+					address: {
+						street: streetField.getValue().trim(),
+						houseNumber: houseNumberField.getValue().trim(),
+						apartmentNumber: apartmentNumberField.getValue().trim(),
+						country: countryField.getValue().trim(),
+						city: cityField.getValue().trim(),
+						postalCode: postalCodeField.getValue().trim(),
+					},
+					contact: {
+						cellphone: phoneField.getValue().trim(),
+						email: emailField.getValue().trim(),
+					}
+				};
 
-			if (isEmpty(payload.contact.email)) { emailField.setError('Email address is required'); hasError = true; }
-			else if (!validateEmail(payload.contact.email)) { emailField.setError('Enter a valid email'); hasError = true; }
+				// Validate
+				let hasError = false;
+				if (isEmpty(payload.person.name)) { firstNameField.setError('Name is required'); hasError = true; }
+				if (isEmpty(payload.person.surname)) { lastNameField.setError('Surname is required'); hasError = true; }
 
-			if (hasError) return;
+				if (isEmpty(payload.address.street)) { streetField.setError('Street is required'); hasError = true; }
+				if (isEmpty(payload.address.houseNumber)) { houseNumberField.setError('House number is required'); hasError = true; }
+				if (isEmpty(payload.address.country)) { countryField.setError('Country is required'); hasError = true; }
+				if (isEmpty(payload.address.city)) { cityField.setError('City is required'); hasError = true; }
+				if (isEmpty(payload.address.postalCode)) { postalCodeField.setError('Postal code is required'); hasError = true; }
+				else if (!validatePostal(payload.address.postalCode)) { postalCodeField.setError('Enter a valid postal code'); hasError = true; }
 
-			// Submit (placeholder): simulate request
-			const timer = typeof createAccessibilityTimer === 'function' ? createAccessibilityTimer(300) : { wait: () => Promise.resolve() };
-			submitBtn.setLoading(true);
-			[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-				apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-				.forEach(f => f.disable());
-			workedBeforeInput.disabled = true;
+				if (isEmpty(payload.contact.cellphone)) { phoneField.setError('Cellphone number is required'); hasError = true; }
+				else if (!validatePhone(payload.contact.cellphone)) { phoneField.setError('Enter a valid phone number'); hasError = true; }
 
-			try {
-				let ok = true;
-				if (typeof createApiConnector === 'function') {
-					// If your API connector exposes an onboarding method, plug it here
-					const api = createApiConnector();
-					if (typeof api.reportOnboarding === 'function') {
-						const res = await api.reportOnboarding(payload);
-						ok = !!res?.ok;
-						if (!ok && res?.validationError) {
-							// Example: map server-side validation back to fields
-							const prop = String(res.validationError.property_name || '').toLowerCase();
-							const msg = res.validationError.message || 'Invalid value';
-							switch (prop) {
-								case 'name': firstNameField.setError(msg); break;
-								case 'surname': lastNameField.setError(msg); break;
-								case 'street': streetField.setError(msg); break;
-								case 'housenumber': houseNumberField.setError(msg); break;
-								case 'country': countryField.setError(msg); break;
-								case 'city': cityField.setError(msg); break;
-								case 'postalcode': postalCodeField.setError(msg); break;
-								case 'cellphone': phoneField.setError(msg); break;
-								case 'email': emailField.setError(msg); break;
-								default:
-									// Show general error modal
-									const modal = mountModal('#error-modal-root', {
-										title: 'Validation error',
-										contentHtml: `<p class="text-neutral-300">${escapeHtml(msg)}</p>`,
-										size: 'md',
-										primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
-										secondaryAction: null,
-										onClose: (api) => api.destroy(),
-									});
-									modal.open();
+				if (isEmpty(payload.contact.email)) { emailField.setError('Email address is required'); hasError = true; }
+				else if (!validateEmail(payload.contact.email)) { emailField.setError('Enter a valid email'); hasError = true; }
+
+				if (hasError) return;
+
+				// Submit (placeholder): simulate request
+				const timer = typeof createAccessibilityTimer === 'function' ? createAccessibilityTimer(300) : { wait: () => Promise.resolve() };
+				submitBtn.setLoading(true);
+				[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
+					apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
+					.forEach(f => f.disable());
+				workedBeforeInput.disabled = true;
+
+				try {
+					let ok = true;
+					if (typeof createApiConnector === 'function') {
+						// If your API connector exposes an onboarding method, plug it here
+						const api = createApiConnector();
+						if (typeof api.reportOnboarding === 'function') {
+							const res = await api.reportOnboarding(payload);
+							ok = !!res?.ok;
+							if (!ok && res?.validationError) {
+								// Example: map server-side validation back to fields
+								const prop = String(res.validationError.property_name || '').toLowerCase();
+								const msg = res.validationError.message || 'Invalid value';
+								switch (prop) {
+									case 'name': firstNameField.setError(msg); break;
+									case 'surname': lastNameField.setError(msg); break;
+									case 'street': streetField.setError(msg); break;
+									case 'housenumber': houseNumberField.setError(msg); break;
+									case 'country': countryField.setError(msg); break;
+									case 'city': cityField.setError(msg); break;
+									case 'postalcode': postalCodeField.setError(msg); break;
+									case 'cellphone': phoneField.setError(msg); break;
+									case 'email': emailField.setError(msg); break;
+									default:
+										// Show general error modal
+										const modal = mountModal('#error-modal-root', {
+											title: 'Validation error',
+											contentHtml: `<p class="text-neutral-300">${escapeHtml(msg)}</p>`,
+											size: 'md',
+											primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
+											secondaryAction: null,
+											onClose: (api) => api.destroy(),
+										});
+										modal.open();
+								}
+							} else if (!ok && res?.unknownError) {
+								throw new Error(String(res.unknownError));
 							}
-						} else if (!ok && res?.unknownError) {
-							throw new Error(String(res.unknownError));
+						} else {
+							// No API method: simulate ok
+							await new Promise(r => setTimeout(r, 800));
+							ok = true;
 						}
 					} else {
-						// No API method: simulate ok
+						// No connector in scope: simulate ok
 						await new Promise(r => setTimeout(r, 800));
 						ok = true;
 					}
-				} else {
-					// No connector in scope: simulate ok
-					await new Promise(r => setTimeout(r, 800));
-					ok = true;
-				}
 
-				await timer.wait();
-				submitBtn.setLoading(false);
-				[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-					apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-					.forEach(f => f.enable());
-				workedBeforeInput.disabled = false;
+					await timer.wait();
+					submitBtn.setLoading(false);
+					[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
+						apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
+						.forEach(f => f.enable());
+					workedBeforeInput.disabled = false;
 
-				if (ok) {
-					const summaryHtml = `
+					if (ok) {
+						const summaryHtml = `
 <div class="space-y-2 text-sm">
 <p class="text-neutral-300">Onboarding has been submitted successfully.</p>
 <div class="text-neutral-400">
@@ -366,44 +422,46 @@
 </div>
 </div>
 `;
-					const successModal = mountModal('#error-modal-root', {
-						title: 'Onboarding submitted',
-						contentHtml: summaryHtml,
+						const successModal = mountModal('#error-modal-root', {
+							title: 'Onboarding submitted',
+							contentHtml: summaryHtml,
+							size: 'md',
+							primaryAction: { label: 'Close', onClick: (_, api) => api.close() },
+							secondaryAction: { label: 'Report another', onClick: (_, api) => { api.close(); document.getElementById('onboarding-form').reset(); } },
+							onClose: (api) => api.destroy(),
+						});
+						successModal.open();
+
+						// Optional: clear non-required fields only; here we leave values for convenience
+						// If you want full reset uncomment below:
+						// [firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
+						//  apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
+						//  .forEach(f => f.clear({ silent: true }));
+						// workedBeforeInput.checked = false; workedBeforeLabel.textContent = 'No';
+					}
+				} catch (err) {
+					await timer.wait();
+					submitBtn.setLoading(false);
+					[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
+						apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
+						.forEach(f => f.enable());
+					workedBeforeInput.disabled = false;
+
+					const modalApi = mountModal('#error-modal-root', {
+						title: 'A critical error occured',
+						contentHtml: `<p class="text-neutral-300">${escapeHtml(err?.message || String(err))}</p>`,
 						size: 'md',
-						primaryAction: { label: 'Close', onClick: (_, api) => api.close() },
-						secondaryAction: { label: 'Report another', onClick: (_, api) => { api.close(); document.getElementById('onboarding-form').reset(); } },
+						primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
+						secondaryAction: null,
 						onClose: (api) => api.destroy(),
 					});
-					successModal.open();
-
-					// Optional: clear non-required fields only; here we leave values for convenience
-					// If you want full reset uncomment below:
-					// [firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-					//  apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-					//  .forEach(f => f.clear({ silent: true }));
-					// workedBeforeInput.checked = false; workedBeforeLabel.textContent = 'No';
+					modalApi.open();
 				}
-			} catch (err) {
-				await timer.wait();
-				submitBtn.setLoading(false);
-				[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-					apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-					.forEach(f => f.enable());
-				workedBeforeInput.disabled = false;
-
-				const modalApi = mountModal('#error-modal-root', {
-					title: 'A critical error occured',
-					contentHtml: `<p class="text-neutral-300">${escapeHtml(err?.message || String(err))}</p>`,
-					size: 'md',
-					primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
-					secondaryAction: null,
-					onClose: (api) => api.destroy(),
-				});
-				modalApi.open();
 			}
-		}
 
-		document.getElementById('address-form').addEventListener('submit', submitOnboarding);
+			document.getElementById('address-form').addEventListener('submit', submitOnboarding);
+		})();
+
 		</script>
 	</body>
 </html>

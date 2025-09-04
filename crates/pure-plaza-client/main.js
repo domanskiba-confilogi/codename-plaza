@@ -55,6 +55,7 @@ function createApiConnector(config = {}) {
 	const {
 		baseUrl = '/api',            // np. "https://api.twojadomena.com"
 		timeout = 15000,         // domyślny timeout 15s
+		authStore = null,
 		defaultHeaders = {},     // dodatkowe nagłówki jeżeli potrzebne
 	} = config;
 
@@ -71,11 +72,11 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	function result({ ok = null, validationError = null, unknownError = null }) {
-		return { ok, validationError, unknownError };
-	}
-
 	async function login({ email, password } = {}) {
+		function result({ ok = null, validationError = null, unknownError = null }) {
+			return { ok, validationError, unknownError };
+		}
+
 		email = email ?? '';
 		password = password ?? '';
 
@@ -134,7 +135,178 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login };
+	async function getLoggedInUser() {
+		function result({ ok = null, unauthorizedError = null, unknownError = null }) {
+			return { ok, unauthorizedError, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/auth/user'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (data && typeof data === 'object' && data.id && data.email && data.full_name) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			if (res.status === 401) {
+				return result({
+					unauthorizedError: new Error("Unauthorized"),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function getJobTitles() {
+		function result({ ok = null, unauthorizedError = null, unknownError = null }) {
+			return { ok, unauthorizedError, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/job-titles'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			if (res.status === 401) {
+				return result({
+					unauthorizedError: new Error("Unauthorized"),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function getCompanyDepartments() {
+		function result({ ok = null, unauthorizedError = null, unknownError = null }) {
+			return { ok, unauthorizedError, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/company-departments'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			if (res.status === 401) {
+				return result({
+					unauthorizedError: new Error("Unauthorized"),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments };
 }
 
 // High-resolution time when available (browser/Node)
@@ -254,7 +426,7 @@ function createAuthStore(options = {}) {
 			return inMemoryUser;
 		},
 
-		getAuthenticationToken() {
+		getAuthorizationToken() {
 			return storage.get();
 		},
 
@@ -263,4 +435,21 @@ function createAuthStore(options = {}) {
 			return typeof token === 'string' && token.length > 0;
 		},
 	};
+}
+
+async function checkIsLoggedInMiddleware(authStore) {
+	const apiConnector = createApiConnector();
+
+	const result = await apiConnector.getLoggedInUser();
+
+	if (result.unauthorizedError !== null) {
+		window.location.href = '/sign-in.html';
+	} else if (result.ok !== null) {
+		authStore.setLoggedInUser(authStore.getAuthorizationToken(), result.ok);
+	} else {
+		const errorModal = mountModal("#event-modal", {
+			title: "A critical error occured",
+			contentHtml: `${result.unknownError}`
+		});
+	}
 }

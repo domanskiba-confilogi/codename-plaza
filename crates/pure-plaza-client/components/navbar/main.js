@@ -178,7 +178,7 @@ ${entry.separator ? '<div class="my-2 border-t border-neutral-800"></div>' : `
 		<div class="flex h-16 items-center justify-between">
 			${renderLogo()}
 
-			<nav class="hidden md:flex items-center gap-2">
+			<nav class="hidden lg:flex items-center gap-2">
 				${cfg.items.map(renderDesktopItem).join('')}
 
 				<a href="${esc(cfg.ctaHref)}"
@@ -187,7 +187,7 @@ ${entry.separator ? '<div class="my-2 border-t border-neutral-800"></div>' : `
 				</a>
 			</nav>
 
-			<div class="md:hidden">
+			<div class="lg:hidden">
 				<button
 					type="button"
 					id="${uid}-mobileBtn"
@@ -207,7 +207,7 @@ ${entry.separator ? '<div class="my-2 border-t border-neutral-800"></div>' : `
 		</div>
 	</div>
 
-	<div id="${uid}-mobileMenu" class="md:hidden hidden border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
+	<div id="${uid}-mobileMenu" class="lg:hidden hidden border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
 		<div class="space-y-1 px-4 py-4">
 			${cfg.items.map(renderMobileItem).join('')}
 			<a href="${esc(cfg.ctaHref)}" class="block rounded-md bg-yellow-400 px-4 py-3 text-center text-sm font-semibold text-black hover:bg-yellow-300">${esc(cfg.ctaText)}</a>
