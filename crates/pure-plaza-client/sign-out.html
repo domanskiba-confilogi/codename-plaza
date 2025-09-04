@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Confilogi IT Support - Sign out</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Tailwind CSS (CDN) -->
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+		<!-- Navbar -->
+
+		<div id="suspense-screen-root"></div>
+
+		<script src="./main.js"></script>
+		<script src="./components/suspense_screen/main.js"></script>
+
+		<script>
+		const suspenseScreen = mountSuspenseScreen("#suspense-screen-root", {
+			message: "Signing out...",
+		});
+
+		const authStore = createAuthStore();
+
+		const timer = createAccessibilityTimer(500);
+
+		(async () => {
+			await timer.wait();
+
+			authStore.setLoggedInUser(null, null);
+			window.location.href = '/sign-in.html';
+		})();
+		</script>
+	</body>
+</html>
+
+

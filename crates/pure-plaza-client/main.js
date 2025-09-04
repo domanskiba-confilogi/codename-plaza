@@ -16,10 +16,9 @@ function escapeHtml(str) {
 }
 
 const LOGGED_IN_NAVBAR_ITEMS = [
-	{ type: 'link', label: 'Reported problems', href: '#reported-problems' },
-	{ type: 'link', label: 'Report problem', href: '#report-problem' },
-	{ type: 'link', label: 'Contact', href: '#contact' },
-	{ type: 'link', label: 'Where is my package?', href: '#track-package' },
+	{ type: 'link', label: 'Reported problems', href: '/reported-problems.html' },
+	{ type: 'link', label: 'Report problem', href: '/report-problem.html' },
+	{ type: 'link', label: 'My account', href: '/my-account.html' },
 	{
 		type: 'dropdown',
 		id: 'administration',
@@ -33,7 +32,7 @@ const LOGGED_IN_NAVBAR_ITEMS = [
 			{ label: 'Other settings', href: '#admin/other-settings' },
 		]
 	},
-	{ type: 'link', label: 'Sign out', href: '#sign-out' }
+	{ type: 'link', label: 'Sign out', href: '/sign-out.html' }
 ];
 
 const LOGGED_OUT_NAVBAR_ITEMS = [
@@ -41,8 +40,8 @@ const LOGGED_OUT_NAVBAR_ITEMS = [
 ];
 
 const LOGGED_IN_NAVBAR_ARGS = {
-	ctaText: 'My account',
-	ctaHref: '/my-account.html',
+	ctaText: 'Contact',
+	ctaHref: '/contact.html',
 	items: LOGGED_IN_NAVBAR_ITEMS,
 }
 
@@ -81,7 +80,7 @@ function createApiConnector(config = {}) {
 		password = password ?? '';
 
 		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-		const timer = controller ? setTimeout(() => controller.abort(), timeout) : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
 
 		try {
 			const res = await fetch(toURL('/auth/login'), {
@@ -136,4 +135,132 @@ function createApiConnector(config = {}) {
 	}
 
 	return { login };
+}
+
+// High-resolution time when available (browser/Node)
+const now = () =>
+	(typeof performance !== "undefined" && typeof performance.now === "function")
+		? performance.now()
+		: Date.now();
+
+function createAccessibilityTimer(totalMs) {
+	if (!Number.isFinite(totalMs) || totalMs < 0) {
+		throw new TypeError("totalMs must be a non-negative number");
+	}
+
+	const startedAt = now();
+
+	const api = {
+		// Milliseconds left until totalMs has elapsed since creation
+		remaining() {
+			const elapsed = now() - startedAt;
+			// ceil to ensure we never resolve earlier than totalMs
+			return Math.max(0, Math.ceil(totalMs - elapsed));
+		},
+
+		// Milliseconds elapsed since creation
+		elapsed() {
+			return Math.max(0, now() - startedAt);
+		},
+
+		// Whether the timer has fully elapsed
+		done() {
+			return api.remaining() === 0;
+		},
+
+		// Wait until the remaining time elapses.
+		// Optional AbortSignal support: wait(signal)
+		wait(signal) {
+			const ms = api.remaining();
+			if (ms === 0) return Promise.resolve();
+
+			return new Promise((resolve, reject) => {
+				const id = setTimeout(resolve, ms);
+
+				if (signal) {
+					const onAbort = () => {
+						clearTimeout(id);
+						signal.removeEventListener("abort", onAbort);
+						const err = (typeof DOMException !== "undefined")
+							? new DOMException("Aborted", "AbortError")
+							: Object.assign(new Error("Aborted"), { name: "AbortError" });
+						reject(signal.reason ?? err);
+					};
+
+					if (signal.aborted) {
+						onAbort();
+					} else {
+						signal.addEventListener("abort", onAbort, { once: true });
+					}
+				}
+			});
+		},
+	};
+
+	return api;
+}
+
+function createAuthStore(options = {}) {
+	const STORAGE_KEY = options.storageKey || 'auth.token';
+
+	// Fallback-safe localStorage access
+	const storage = (() => {
+		let available = false;
+		try {
+			if (typeof window !== 'undefined' && window.localStorage) {
+				const t = '__auth_store_test__';
+				window.localStorage.setItem(t, '1');
+				window.localStorage.removeItem(t);
+				available = true;
+			}
+		} catch (_) {
+			available = false;
+		}
+		let memoryToken = null;
+
+		return {
+			set(token) {
+				if (available) window.localStorage.setItem(STORAGE_KEY, token);
+					else memoryToken = token;
+			},
+			get() {
+				if (available) return window.localStorage.getItem(STORAGE_KEY);
+				return memoryToken;
+			},
+			remove() {
+				if (available) window.localStorage.removeItem(STORAGE_KEY);
+					else memoryToken = null;
+			},
+		};
+	})();
+
+	// User is kept only in memory (not persisted)
+	let inMemoryUser = null;
+
+	return {
+		// save token inside localStorage, without user
+		setLoggedInUser(authentication_token, user) {
+			if (typeof authentication_token === 'string' && authentication_token.length > 0) {
+				storage.set(authentication_token);
+			} else {
+				// If no valid token provided, clear stored token
+				storage.remove();
+			}
+			// Store user only in memory (session-scoped)
+			inMemoryUser = user ?? null;
+		},
+
+		getLoggedInUser() {
+			return inMemoryUser;
+		},
+
+		getAuthenticationToken() {
+			return storage.get();
+		},
+
+		isUserLoggedIn() {
+			const token = storage.get();
+			return typeof token === 'string' && token.length > 0;
+		},
+	};
 }

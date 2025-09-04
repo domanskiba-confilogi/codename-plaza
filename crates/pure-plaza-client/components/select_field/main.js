@@ -2,8 +2,8 @@
 // Requires TailwindCSS present on the page.
 // Usage:
 //   const api = mountSelectField('#target', [
-//     { value: 1, display_text: 'Apple' },
-//     { value: 2, display_text: 'Banana' },
+//     { value: 1, displayText: 'Apple' },
+//     { value: 2, displayText: 'Banana' },
 //   ], { label: 'Choose fruits', placeholder: 'Search...' });
 
 function mountSelectField(selector, items, options = {}) {
@@ -14,7 +14,7 @@ function mountSelectField(selector, items, options = {}) {
 	}
 
 	if (!Array.isArray(items)) {
-		throw new Error('mountSelectField: "items" must be an array of { value, display_text }');
+		throw new Error('mountSelectField: "items" must be an array of { value, displayText }');
 	}
 
 	const cfg = {
@@ -36,11 +36,11 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	root.innerHTML = `
 <div class="flex flex-col gap-2 relative group">
 	<label class="text-sm font-medium" for="${cfg.id}">${escapeHtml(cfg.label)}</label>
-	<div class="chips flex flex-row gap-4 w-full flex-wrap"></div>
+	<div class="chips flex flex-row gap-2 w-full flex-wrap hidden"></div>
 	<input
 		id="${cfg.id}"
 		type="text"
-		class="peer border-[3px] border-neutral-800 rounded-xl px-4 py-3 focus:outline-none appearance-none bg-neutral-950"
+		class="peer w-full rounded-md bg-neutral-950/60 text-neutral-100 placeholder-neutral-500 px-3.5 py-2.5 transition hover:bg-neutral-900/60 focus:outline-none focus:bg-neutral-950/80 ring-1 ring-inset ring-neutral-800 focus:ring-2 focus:ring-blue-400/60 disabled:bg-neutral-800 disabled:text-neutral-400 disabled:cursor-not-allowed"
 		placeholder="${escapeHtml(cfg.placeholder)}"
 		autocomplete="off"
 	/>
@@ -64,26 +64,29 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		const q = state.search.toLowerCase().trim();
 		return state.items
 			.filter(item => !state.chosen.includes(item.value))
-			.filter(item => item.display_text.toLowerCase().trim().includes(q));
+			.filter(item => item.displayText.toLowerCase().trim().includes(q));
 	}
 
 	function renderChips() {
 		chips.innerHTML = '';
+
+		chips.classList.toggle("hidden", state.chosen.length === 0);
+
 		state.chosen.forEach(val => {
 			const item = state.items.find(i => i.value === val);
 			if (!item) return;
 
 			const chip = document.createElement('div');
-			chip.className = 'px-4 py-2 rounded-xl bg-neutral-900 flex flex-row gap-2 justify-center items-center group/item cursor-default';
+			chip.className = 'px-3 py-1.5 rounded bg-neutral-950/60 ring-1 ring-inset ring-neutral-800 flex flex-row gap-2 justify-center items-center group/item cursor-default';
 
 			const label = document.createElement('span');
-			label.textContent = item.display_text;
+			label.textContent = item.displayText;
 			label.className = 'select-none';
 
 			const btn = document.createElement('button');
 			btn.type = 'button';
 			btn.className = 'shrink-0 p-1 rounded hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-yellow-400/60';
-			btn.setAttribute('aria-label', `Usuń ${item.display_text}`);
+			btn.setAttribute('aria-label', `Usuń ${item.displayText}`);
 			btn.innerHTML = X_ICON_SVG;
 			btn.addEventListener('click', (e) => {
 				e.stopPropagation();
@@ -110,7 +113,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				const btn = document.createElement('button');
 				btn.type = 'button';
 				btn.className = 'text-start w-full px-4 py-2 bg-neutral-900 focus:bg-neutral-800 hover:bg-neutral-800 cursor-pointer';
-				btn.textContent = item.display_text;
+				btn.textContent = item.displayText;
 				btn.addEventListener('click', () => {
 					chooseItem(item.value);
 				});

@@ -8,13 +8,14 @@
 		<script src="https://cdn.tailwindcss.com"></script>
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
 		<!-- Navbar -->
 		<div id="navbar-root"></div>
 
 		<!-- Main -->
 		<main class="flex-1 flex items-center justify-center px-4 py-12">
 			<div class="w-full max-w-md">
-				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 shadow-lg">
+				<form id="login-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 shadow-lg">
 					<h1 class="text-xl font-semibold mb-6">Sign in</h1>
 
 					<!-- Email -->
@@ -39,6 +40,7 @@
 		<script src="./components/navbar/main.js"></script>
 		<script src="./components/text_field/main.js"></script>
 		<script src="./components/button/main.js"></script>
+		<script src="./components/modal/main.js"></script>
 
 		<script>
 		const navbar = mountNavbar('#navbar-root', {
@@ -81,11 +83,9 @@
 			variant: 'primary',
 			size: 'md',
 			type: 'submit', // applies when rendered as <button> <source_id data="1" title="documentation.md" />
-			onClick: (e) => {
-				e.preventDefault();
-				sendLoginRequest();
-			}
 		});
+
+		const authStore = createAuthStore();
 
 		async function sendLoginRequest() {
 			const email = emailField.getValue();
@@ -97,7 +97,13 @@
 				password
 			};
 
-			const apiConnector= createApiConnector();
+			emailField.disable();
+			passwordField.disable();
+			submitBtn.setLoading(true);
+
+			const timer = createAccessibilityTimer(300);
+
+			const apiConnector = createApiConnector();
 
 			const result = await apiConnector.login({
 				email,
@@ -105,7 +111,14 @@
 			});
 
 			if (result.ok !== null) {
-				console.log(result.ok);
+				const { authorization_token: authorizationToken, user } = result.ok;
+
+				authStore.setLoggedInUser(authorizationToken, user);
+				console.log("Logged in successfully!");
+
+				window.location.href = '/reported-problems.html';
+
+				await new Promise(r => setTimeout(r, 3_600_000)); // 1 hour
 			} else if (result.validationError !== null) {
 				let {
 					message, property_name: propertyName
@@ -119,9 +132,30 @@
 					passwordField.setError(message);
 				}
 			} else {
-				console.log(result.unknownError);
+				const modalApi = mountModal("#error-modal-root", {
+					title: 'A critical error occured',
+					contentHtml: `<p class="text-neutral-300">${escapeHtml(result.unknownError.toString())}</p>`,
+					size: 'md',
+					primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
+					secondaryAction: null,
+					onClose: (api) => api.destroy(),
+				});
+
+				modalApi.open();
 			}
+
+			await timer.wait();
+
+			emailField.enable();
+			passwordField.enable();
+			submitBtn.setLoading(false);
 		}
+
+		document.querySelector("#login-form").addEventListener("submit", async (e) => {
+			e.preventDefault();
+
+			await sendLoginRequest();
+		})
 		</script>
 	</body>
 </html>

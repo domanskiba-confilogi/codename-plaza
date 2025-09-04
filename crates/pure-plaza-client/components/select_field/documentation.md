@@ -30,9 +30,9 @@ Wielokrotny wybór z wyszukiwarką i „chipsami”, montowany w wybranym elemen
 <script>
   // Zakładając, że kod mountSelectField jest załadowany
   const api = mountSelectField('#target', [
-    { value: 1, display_text: 'Apple' },
-    { value: 2, display_text: 'Banana' },
-    { value: 3, display_text: 'Cherry' },
+    { value: 1, displayText: 'Apple' },
+    { value: 2, displayText: 'Banana' },
+    { value: 3, displayText: 'Cherry' },
   ], {
     label: 'Wybierz owoce',
     placeholder: 'Szukaj...'
@@ -56,9 +56,9 @@ const api = mountSelectField(selector, items, options);
 ```
 
 - selector: string (np. '#target') — CSS selektor elementu, do którego komponent zostanie zamontowany. Rzuca błąd, jeśli nie znaleziono elementu.
-- items: Array<{ value, display_text }> — lista pozycji do wyboru.
+- items: Array<{ value, displayText }> — lista pozycji do wyboru.
   - value: prymityw (liczba, string itp.) porównywany ściśle (===)
-  - display_text: string wyświetlany użytkownikowi
+  - displayText: string wyświetlany użytkownikowi
 - options: obiekt konfiguracyjny (opcjonalny)
   - label: string (domyślnie "Select items")
   - placeholder: string (domyślnie "Search...")
@@ -66,8 +66,8 @@ const api = mountSelectField(selector, items, options);
 Przykład:
 ```js
 const api = mountSelectField('#filters', [
-  { value: 'pl', display_text: 'Polska' },
-  { value: 'de', display_text: 'Niemcy' },
+  { value: 'pl', displayText: 'Polska' },
+  { value: 'de', displayText: 'Niemcy' },
 ], {
   label: 'Kraje',
   placeholder: 'Filtruj...'
@@ -76,7 +76,7 @@ const api = mountSelectField('#filters', [
 
 ## Zachowanie i UX
 
-- Filtrowanie: wpisany tekst jest porównywany z display_text (case-insensitive, z trim); pokazywane są wyłącznie pozycje jeszcze nie wybrane.
+- Filtrowanie: wpisany tekst jest porównywany z displayText (case-insensitive, z trim); pokazywane są wyłącznie pozycje jeszcze nie wybrane.
 - Wybór:
   - Kliknięcie pozycji na liście lub naciśnięcie Enter wybiera pierwszą pasującą pozycję.
   - Po wyborze pozycja staje się chipem nad polem, menu zamyka się, a po krótkiej chwili znów się otwiera i kursor pozostaje w polu (ułatwia szybkie kolejne wybory).
@@ -94,7 +94,7 @@ Uwaga: komunikaty wbudowane w komponent (np. „Brak wyników”) i aria-label n
 Obiekt zwracany przez funkcję montującą:
 
 - getChosen(): number[] | string[] — zwraca kopię tablicy aktualnie wybranych wartości (kolejność wg kolejności wyboru).
-- setItems(nextItems: Array<{ value, display_text }>): void
+- setItems(nextItems: Array<{ value, displayText }>): void
   - Podmienia listę dostępnych pozycji.
   - Ważne: po podmianie komponent automatycznie zaznacza wszystkie pozycje z nowej listy (wszystkie wartości trafiają do chosen). To intencjonalne zachowanie w kodzie — jeśli chcesz innej logiki, zobacz sekcję „Wzorce/Recipe”.
 - clear(): void — usuwa wszystkie wybrane pozycje i czyści pole wyszukiwania.
@@ -109,7 +109,7 @@ api.getChosen();          // np. [1, 2]
 api.clear();              // []
 api.clearSearch();        // czyści tekst, nie rusza wyboru
 api.focus();              // fokus do pola
-api.setItems([{ value: 'a', display_text: 'A' }]); // chosen => ['a']
+api.setItems([{ value: 'a', displayText: 'A' }]); // chosen => ['a']
 api.destroy();            // demontaż
 ```
 

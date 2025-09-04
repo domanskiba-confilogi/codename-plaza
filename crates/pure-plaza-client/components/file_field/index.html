@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Przykład użycia mountFileField (Tailwind + Pure JS)</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+		<header class="mb-8">
+			<h1 class="text-2xl font-semibold">Przykład komponentu FileField</h1>
+			<p class="text-neutral-400">Pure JS + TailwindCSS. Dwie instancje komponentu + mini formularz.</p>
+		</header>
+
+		<main class="flex flex-col lg:flex-row gap-10">
+			<!-- Instancja 1 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 1 (podstawowa)</h2>
+				<div id="file1"></div>
+
+				<div class="rounded-lg border border-neutral-800 p-4">
+					<h3 class="text-sm font-medium mb-2">Wybrane pliki (instancja 1)</h3>
+					<ul id="file1List" class="text-sm text-neutral-300 space-y-1"></ul>
+					<p id="file1Summary" class="mt-2 text-xs text-neutral-500"></p>
+				</div>
+
+				<div class="flex flex-wrap gap-3">
+					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż pliki</button>
+					<button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+					<button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					<button id="toggle1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zablokuj</button>
+				</div>
+			</section>
+
+			<!-- Instancja 2 -->
+			<section class="space-y-4 w-full">
+				<h2 class="text-lg font-medium">Instancja 2 (zaawansowana)</h2>
+
+				<!-- Tekstowe pole tytułu (wykorzystuje mountTextField z ./main.js) -->
+				<div id="title2"></div>
+
+				<div id="file2"></div>
+
+				<div class="rounded-lg border border-neutral-800 p-4">
+					<h3 class="text-sm font-medium mb-2">Wybrane pliki (instancja 2)</h3>
+					<ul id="file2List" class="text-sm text-neutral-300 space-y-1"></ul>
+					<p id="file2Summary" class="mt-2 text-xs text-neutral-500"></p>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div class="flex flex-wrap gap-3">
+						<button id="accImg" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Akceptuj: obrazy</button>
+						<button id="accLog" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Akceptuj: .log, .txt</button>
+						<button id="accAny" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Akceptuj: dowolne</button>
+					</div>
+					<div class="flex flex-wrap gap-3">
+						<button id="toggleMultiple2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Multiple: włącz</button>
+						<button id="validate2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Waliduj teraz</button>
+						<button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
+						<button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					</div>
+				</div>
+
+				<div class="pt-2">
+					<button id="submit2" class="px-5 py-2.5 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black font-medium">Wyślij (mock)</button>
+					<p class="mt-2 text-xs text-neutral-500">Weryfikuje tytuł (≥ 3 znaki) oraz pliki (max 10MB/plik, max 2 pliki).</p>
+				</div>
+			</section>
+		</main>
+
+		<!-- Udostępnia m.in. mountTextField -->
+		<script src="/main.js"></script>
+		<!-- Komponent FileField -->
+		<script src="/components/file_field/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+
+		<script>
+		// Pomocniczo: format rozmiaru
+		function bytesToHuman(n) {
+			const units = ["B", "KB", "MB", "GB"];
+			let i = 0, val = n;
+			while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+			return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+		}
+
+		// Instancja 1 (podstawowa)
+		const api1 = mountFileField("#file1", {
+			label: "Załączniki (opcjonalnie)",
+			hint: "Dodaj screenshoty lub logi. Max 10MB na plik.",
+			multiple: true,
+			maxFileSizeMB: 10,
+			onChange: () => renderList1(),
+		});
+
+		const file1List = document.getElementById("file1List");
+		const file1Summary = document.getElementById("file1Summary");
+
+		function renderList1() {
+			const files = api1.getFiles();
+			file1List.innerHTML = "";
+			let total = 0;
+			files.forEach((f) => {
+				total += f.size;
+				const li = document.createElement("li");
+				li.textContent = `${f.name} — ${bytesToHuman(f.size)} (${f.type || "unknown"})`;
+				file1List.appendChild(li);
+			});
+			file1Summary.textContent = files.length
+				? `Łącznie: ${files.length} plik(i), ${bytesToHuman(total)}`
+				: "Brak plików";
+		}
+		renderList1();
+
+		document.getElementById("show1").addEventListener("click", () => {
+			alert("Wybrane pliki (instancja 1): " + JSON.stringify(api1.getFiles().map(f => ({ name: f.name, size: f.size, type: f.type })), null, 2));
+		});
+		document.getElementById("clear1").addEventListener("click", () => {
+			api1.clear();
+			api1.clearError();
+			renderList1();
+		});
+		document.getElementById("focus1").addEventListener("click", () => {
+			api1.focus();
+		});
+		let locked1 = false;
+		document.getElementById("toggle1").addEventListener("click", (e) => {
+			locked1 = !locked1;
+			if (locked1) {
+				api1.disable();
+				e.currentTarget.textContent = "Odblokuj";
+			} else {
+				api1.enable();
+				e.currentTarget.textContent = "Zablokuj";
+			}
+		});
+
+		// Instancja 2 (zaawansowana) + TextField (tytuł)
+		const title2 = mountTextField("#title2", {
+			type: 'text',
+			label: "Tytuł",
+			placeholder: "Krótki tytuł (min. 3 znaki)",
+			clearErrorOnInput: true,
+		});
+
+		const api2 = mountFileField("#file2", {
+			label: "Załącz pliki do zgłoszenia",
+			hint: "Dozwolone typy możesz przełączać poniżej. Limit: 2 pliki, maks. 10MB każdy.",
+			multiple: false,
+			maxFileSizeMB: 10,
+			maxFiles: 2,
+			onChange: () => renderList2(),
+		});
+
+		const file2List = document.getElementById("file2List");
+		const file2Summary = document.getElementById("file2Summary");
+
+		function renderList2() {
+			const files = api2.getFiles();
+			file2List.innerHTML = "";
+			let total = 0;
+			files.forEach((f) => {
+				total += f.size;
+				const li = document.createElement("li");
+				li.textContent = `${f.name} — ${bytesToHuman(f.size)} (${f.type || "unknown"})`;
+				file2List.appendChild(li);
+			});
+			file2Summary.textContent = files.length
+				? `Łącznie: ${files.length} plik(i), ${bytesToHuman(total)}`
+				: "Brak plików";
+		}
+		renderList2();
+
+		// Accept presets
+		document.getElementById("accImg").addEventListener("click", () => {
+			api2.setAccept("image/*");
+		});
+		document.getElementById("accLog").addEventListener("click", () => {
+			api2.setAccept(".log,.txt");
+		});
+		document.getElementById("accAny").addEventListener("click", () => {
+			api2.setAccept("");
+		});
+
+		// Multiple toggle
+		let multiple2 = false;
+		document.getElementById("toggleMultiple2").addEventListener("click", (e) => {
+			multiple2 = !multiple2;
+			api2.setMultiple(multiple2);
+			e.currentTarget.textContent = `Multiple: ${multiple2 ? "wyłącz" : "włącz"}`;
+		});
+
+		// Validate now (używa wbudowanego helpera)
+		document.getElementById("validate2").addEventListener("click", () => {
+			const res = api2.validate();
+			if (res.valid) {
+				alert("Walidacja OK (instancja 2).");
+			} else {
+				alert("Błąd: " + res.error);
+			}
+		});
+
+		document.getElementById("clear2").addEventListener("click", () => {
+			api2.clear();
+			api2.clearError();
+			renderList2();
+		});
+		document.getElementById("focus2").addEventListener("click", () => {
+			api2.focus();
+		});
+
+		// Submit (mock) — walidacja tytułu + plików
+		document.getElementById("submit2").addEventListener("click", () => {
+			// Tytuł: min 3 znaki
+			const titleVal = (title2.getValue ? title2.getValue() : "").trim();
+			let ok = true;
+			if (titleVal.length < 3) {
+				title2.setError ? title2.setError("Podaj co najmniej 3 znaki.") : null;
+				ok = false;
+			} else {
+				title2.clearError ? title2.clearError() : null;
+			}
+
+			// Pliki: 2 max, 10MB na plik (ustawione przy montowaniu)
+			const v = api2.validate();
+			if (!v.valid) ok = false;
+
+			if (!ok) return;
+
+			const payload = {
+				title: titleVal,
+				attachments: api2.getFiles().map(f => ({ name: f.name, size: f.size, type: f.type })),
+				createdAt: new Date().toISOString(),
+			};
+			alert("Payload (mock):\n" + JSON.stringify(payload, null, 2));
+		});
+		</script>
+	</body>
+</html>

@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Confilogi IT Support - Reported problems</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- Tailwind CSS (CDN) -->
+		<script src="https://cdn.tailwindcss.com"></script>
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
+		<!-- Navbar -->
+		<div id="navbar-root"></div>
+
+		<!-- Main -->
+		<main class="flex-1">
+			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+				<!-- Page header -->
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+					<div>
+						<h1 class="text-xl sm:text-2xl font-semibold">Reported problems</h1>
+						<p class="text-neutral-400 text-sm">View, filter and sort your support tickets.</p>
+					</div>
+					<div id="new-ticket-btn"></div>
+				</div>
+
+				<!-- Filters toolbar -->
+				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 mb-6">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+						<!-- Search -->
+						<div id="search-field"></div>
+						<!-- Category filter -->
+						<div>
+							<div id="category-filter"></div>
+						</div>
+						<!-- Status filter -->
+						<div>
+							<div id="status-filter"></div>
+						</div>
+						<!-- Sorting -->
+						<div class="flex flex-col">
+							<label for="sort-select" class="text-sm font-medium mb-2">Sort by</label>
+							<select id="sort-select" class="w-full rounded-md bg-neutral-950/60 text-neutral-100 placeholder-neutral-500 px-3.5 py-2.5 transition hover:bg-neutral-900/60 focus:outline-none focus:bg-neutral-950/80 ring-1 ring-inset ring-neutral-800 focus:ring-2 focus:ring-blue-400/60">
+								<option value="newest">Newest first</option>
+								<option value="oldest">Oldest first</option>
+								<option value="name-asc">Name A–Z</option>
+								<option value="name-desc">Name Z–A</option>
+								<option value="status-asc">Status A–Z</option>
+								<option value="status-desc">Status Z–A</option>
+								<option value="category-asc">Category A–Z</option>
+								<option value="category-desc">Category Z–A</option>
+							</select>
+							<div class="mt-3" id="reset-filters-btn"></div>
+						</div>
+					</div>
+					<!-- Legend (small) -->
+					<div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+						<span class="mr-1">Legend:</span>
+						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-blue-500/20 text-blue-400">Waiting for support</span>
+						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-amber-500/20 text-amber-400">Waiting for client</span>
+						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-purple-500/20 text-purple-400">Waiting for 3rd party</span>
+						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-green-500/20 text-green-400">Resolved</span>
+						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-red-500/20 text-red-400">Canceled</span>
+					</div>
+				</div>
+
+				<!-- Summary -->
+				<div class="flex items-center justify-between mb-3">
+					<p id="results-summary" class="text-sm text-neutral-400">Showing 0 tickets</p>
+					<p class="text-xs text-neutral-500">Auto-refreshes on filter changes</p>
+				</div>
+
+				<!-- Tickets grid -->
+				<div id="tickets-root" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+
+				<!-- Empty state (hidden by default) -->
+				<div id="empty-state" class="hidden mt-4">
+					<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 text-center">
+						<p class="text-neutral-300 mb-2">No tickets match your filters.</p>
+						<p class="text-neutral-500 text-sm mb-4">Try adjusting filters or reset to view all tickets.</p>
+						<div id="empty-reset"></div>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<script src="./main.js"></script>
+		<script src="./components/navbar/main.js"></script>
+		<script src="./components/text_field/main.js"></script>
+		<script src="./components/button/main.js"></script>
+		<script src="./components/modal/main.js"></script>
+		<script src="./components/select_field/main.js"></script>
+		<script src="./components/suspense_screen/main.js"></script>
+
+		<script>
+		// Navbar
+		const navbar = mountNavbar('#navbar-root', {
+			brandHref: '/',
+			brandName: 'Confilogi',
+			brandAccent: 'IT Support',
+			...LOGGED_IN_NAVBAR_ARGS
+		});
+
+		// Helper: escapeHtml required by SelectField
+		// Also used for safe rendering of dynamic strings below.
+		function escapeHtml(str) {
+			return String(str).replace(/[&<>"']/g, s => ({
+				'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+			}[s]));
+		}
+
+		// Sample data (12 tickets)
+		const TICKETS = [
+			{ id: 'T-1001', name: 'Cannot access VPN', category: 'Network', status: 'Waiting for support', createdAt: '2025-08-30T08:25:00Z', updatedAt: '2025-09-01T11:10:00Z' },
+			{ id: 'T-1002', name: 'Outlook keeps crashing', category: 'Email', status: 'Waiting for client', createdAt: '2025-08-28T15:05:00Z', updatedAt: '2025-08-29T09:40:00Z' },
+			{ id: 'T-1003', name: 'New user account creation', category: 'Access', status: 'Resolved', createdAt: '2025-08-22T12:00:00Z', updatedAt: '2025-08-23T10:20:00Z' },
+			{ id: 'T-1004', name: 'Laptop battery replacement', category: 'Hardware', status: 'Waiting for 3rd party provider', createdAt: '2025-08-27T09:12:00Z', updatedAt: '2025-09-02T13:30:00Z' },
+			{ id: 'T-1005', name: 'Slowness on ERP module', category: 'Software', status: 'Waiting for support', createdAt: '2025-09-01T07:45:00Z', updatedAt: '2025-09-01T08:10:00Z' },
+			{ id: 'T-1006', name: 'Shared drive permission issue', category: 'Access', status: 'Resolved', createdAt: '2025-08-18T10:30:00Z', updatedAt: '2025-08-18T16:00:00Z' },
+			{ id: 'T-1007', name: 'Email delivery delayed', category: 'Email', status: 'Waiting for support', createdAt: '2025-08-31T18:15:00Z', updatedAt: '2025-09-01T09:12:00Z' },
+			{ id: 'T-1008', name: 'Broken HDMI port on docking station', category: 'Hardware', status: 'Canceled', createdAt: '2025-08-20T14:22:00Z', updatedAt: '2025-08-21T08:55:00Z' },
+			{ id: 'T-1009', name: 'Wi-Fi roaming disconnects', category: 'Network', status: 'Waiting for client', createdAt: '2025-08-26T06:50:00Z', updatedAt: '2025-08-26T10:05:00Z' },
+			{ id: 'T-1010', name: 'Time tracking login error', category: 'Software', status: 'Resolved', createdAt: '2025-08-29T11:18:00Z', updatedAt: '2025-08-30T08:05:00Z' },
+			{ id: 'T-1011', name: 'Two-factor code not received', category: 'Access', status: 'Waiting for support', createdAt: '2025-09-02T09:05:00Z', updatedAt: '2025-09-02T09:25:00Z' },
+			{ id: 'T-1012', name: 'Printer not appearing on Mac', category: 'Hardware', status: 'Waiting for 3rd party provider', createdAt: '2025-08-25T13:37:00Z', updatedAt: '2025-08-27T14:01:00Z' },
+		];
+
+		// Filters and sorting state
+		const state = {
+			search: '',
+			categories: [],
+			statuses: [],
+			sort: 'newest',
+		};
+
+		// Components
+		const newTicketBtn = mountButton('#new-ticket-btn', {
+			label: 'New ticket',
+			variant: 'primary',
+			size: 'md',
+			onClick: () => {
+				// Navigate to ticket creation (placeholder)
+				window.location.href = '/report-problem.html';
+			}
+		});
+
+		const emptyResetBtn = mountButton('#empty-reset', {
+			label: 'Reset filters',
+			variant: 'secondary',
+			size: 'sm',
+			onClick: () => resetFilters(),
+		});
+
+		const resetFiltersBtn = mountButton('#reset-filters-btn', {
+			label: 'Reset filters',
+			variant: 'ghost',
+			size: 'sm',
+			onClick: () => resetFilters(),
+		});
+
+		const searchField = mountTextField('#search-field', {
+			type: 'text',
+			label: 'Search tickets',
+			placeholder: 'Search by name...',
+			value: '',
+			clearErrorOnInput: true,
+			onInput: ({ new_value }) => {
+				state.search = (new_value || '').trim().toLowerCase();
+				render();
+			}
+		});
+
+		// Select options
+		const CATEGORY_ITEMS = [
+			{ value: 'Hardware', displayText: 'Hardware' },
+			{ value: 'Software', displayText: 'Software' },
+			{ value: 'Network', displayText: 'Network' },
+			{ value: 'Access', displayText: 'Access' },
+			{ value: 'Email', displayText: 'Email' },
+		];
+		const STATUS_ITEMS = [
+			{ value: 'Waiting for support', displayText: 'Waiting for support' },
+			{ value: 'Waiting for client', displayText: 'Waiting for client' },
+			{ value: 'Waiting for 3rd party provider', displayText: 'Waiting for 3rd party provider' },
+			{ value: 'Resolved', displayText: 'Resolved' },
+			{ value: 'Canceled', displayText: 'Canceled' },
+		];
+
+		// Multi-selects
+		const categorySelect = mountSelectField('#category-filter', CATEGORY_ITEMS, {
+			label: 'Categories',
+			placeholder: 'Filter categories...'
+		});
+		const statusSelect = mountSelectField('#status-filter', STATUS_ITEMS, {
+			label: 'Statuses',
+			placeholder: 'Filter statuses...'
+		});
+
+		// Because SelectField has no external change callback, listen to interactions on its root
+		const scheduleFromSelects = () => {
+			// Delay to let the component update internal state first
+			setTimeout(() => {
+				state.categories = categorySelect.getChosen();
+				state.statuses = statusSelect.getChosen();
+				render();
+			}, 0);
+		};
+		['click', 'keyup', 'input'].forEach(evt => {
+			categorySelect.root.addEventListener(evt, scheduleFromSelects);
+			statusSelect.root.addEventListener(evt, scheduleFromSelects);
+		});
+
+		// Sorting
+		const sortSelect = document.querySelector('#sort-select');
+		sortSelect.addEventListener('change', () => {
+			state.sort = sortSelect.value;
+			render();
+		});
+
+		function resetFilters() {
+			searchField.clear({ silent: true });
+			categorySelect.clear();
+			statusSelect.clear();
+			sortSelect.value = 'newest';
+			state.search = '';
+			state.categories = [];
+			state.statuses = [];
+			state.sort = 'newest';
+			render();
+		}
+
+		// Rendering
+		const ticketsRoot = document.getElementById('tickets-root');
+		const summaryEl = document.getElementById('results-summary');
+		const emptyStateEl = document.getElementById('empty-state');
+
+		function statusBadgeClasses(status) {
+			switch (status) {
+				case 'Waiting for support':
+					return 'bg-blue-500/20 text-blue-400';
+				case 'Waiting for client':
+					return 'bg-amber-500/20 text-amber-400';
+				case 'Waiting for 3rd party provider':
+					return 'bg-purple-500/20 text-purple-400';
+				case 'Resolved':
+					return 'bg-green-500/20 text-green-400';
+				case 'Canceled':
+					return 'bg-red-500/20 text-red-400';
+				default:
+					return 'bg-neutral-800 text-neutral-300';
+			}
+		}
+
+		function categoryBadgeClasses() {
+			return 'bg-neutral-800 text-neutral-300';
+		}
+
+		function applyFiltersAndSort(data) {
+			let rows = data.slice();
+
+			if (state.search) {
+				rows = rows.filter(r => r.name.toLowerCase().includes(state.search));
+			}
+			if (state.categories.length > 0) {
+				const set = new Set(state.categories);
+				rows = rows.filter(r => set.has(r.category));
+			}
+			if (state.statuses.length > 0) {
+				const set = new Set(state.statuses);
+				rows = rows.filter(r => set.has(r.status));
+			}
+
+			const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+			rows.sort((a, b) => {
+				switch (state.sort) {
+					case 'newest':
+						return new Date(b.createdAt) - new Date(a.createdAt);
+					case 'oldest':
+						return new Date(a.createdAt) - new Date(b.createdAt);
+					case 'name-asc':
+						return collator.compare(a.name, b.name);
+					case 'name-desc':
+						return collator.compare(b.name, a.name);
+					case 'status-asc':
+						return collator.compare(a.status, b.status);
+					case 'status-desc':
+						return collator.compare(b.status, a.status);
+					case 'category-asc':
+						return collator.compare(a.category, b.category);
+					case 'category-desc':
+						return collator.compare(b.category, a.category);
+					default:
+						return 0;
+				}
+			});
+
+			return rows;
+		}
+
+		function render() {
+			const filtered = applyFiltersAndSort(TICKETS);
+			summaryEl.textContent = `Showing ${filtered.length} of ${TICKETS.length} tickets`;
+
+			if (filtered.length === 0) {
+				ticketsRoot.innerHTML = '';
+				emptyStateEl.classList.remove('hidden');
+				return;
+			}
+			emptyStateEl.classList.add('hidden');
+
+			const html = filtered.map(t => {
+				const created = new Date(t.createdAt);
+				const updated = new Date(t.updatedAt);
+				return `
+<article class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 flex flex-col gap-3 hover:bg-neutral-900 transition">
+<div class="flex items-start justify-between gap-3">
+<h2 class="text-base sm:text-lg font-semibold leading-snug">
+${escapeHtml(t.name)}
+</h2>
+<span title="${escapeHtml(t.id)}" class="text-xs text-neutral-500 select-all">${escapeHtml(t.id)}</span>
+</div>
+<div class="flex flex-wrap items-center gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${categoryBadgeClasses()}">
+${escapeHtml(t.category)}
+</span>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(t.status)}">
+${escapeHtml(t.status)}
+</span>
+</div>
+<div class="mt-1 text-xs text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">
+<span>Created: ${created.toLocaleString()}</span>
+<span>Updated: ${updated.toLocaleString()}</span>
+</div>
+<div class="mt-2 flex items-center justify-end">
+<a href="/ticket/${encodeURIComponent(t.id)}" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 rounded-md px-2 py-1">
+View details →
+</a>
+</div>
+</article>
+`;
+			}).join('');
+
+			ticketsRoot.innerHTML = html;
+		}
+
+		// Initial render
+		render();
+		</script>
+	</body>
+</html>
