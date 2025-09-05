@@ -272,12 +272,22 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	// Public API
 	return {
 		getChosen: () => state.chosen.slice(),
+		setChosen: (chosenItems) => {
+			if (!Array.isArray(chosenItems)) return;
+
+			state.chosen = chosenItems.slice();
+
+			enforceSelectionLimit();
+
+			renderChips();
+			renderMenu();
+
+			root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
+		},
 		setItems: (nextItems) => {
 			if (!Array.isArray(nextItems)) return;
+			state.chosen = [];
 			state.items = nextItems.slice();
-			const valuesSet = new Set(state.items.map(i => i.value));
-			// Zachowujemy oryginalną logikę – wybrane = wszystkie dostępne wartości
-			state.chosen = [...valuesSet];
 
 			// Jeśli single – zabezpiecz, by został tylko jeden element
 			enforceSelectionLimit();
@@ -286,6 +296,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			renderMenu();
 			root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
 		},
+		getItems: () => state.items.slice(),
 		clear: () => {
 			const removed = state.chosen.slice();
 			state.chosen = [];

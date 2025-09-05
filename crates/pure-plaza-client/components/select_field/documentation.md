@@ -102,10 +102,15 @@ Obiekt zwracany przez `mountSelectField`:
 
 - `getChosen(): string[] | number[] | boolean[]`
   - Zwraca kopię tablicy wybranych wartości.
+- `setChosen(chosenItems: string[] | number[] | boolean[])`
+  - Ustawia wybrane wartości.
+  - Emituje `selectfield:change`.
 - `setItems(nextItems: { value, displayText }[])`
   - Ustawia nową listę elementów.
-  - Ważne: resetuje zaznaczenie do “wszystkie dostępne wartości”. W trybie single natychmiast redukuje do jednego wyboru (pierwszy z listy).
+  - Ważne: resetuje zaznaczenie.
   - Emituje `selectfield:change`.
+- `getItems(): { value, displayText }[]`
+  - Zwraca listę dostępnych elementów do wyboru
 - `clear()`
   - Czyści wszystkie zaznaczenia, resetuje wyszukiwanie, emituje `remove` dla każdego usuniętego oraz odpowiednie `change`.
 - `clearSearch()`
@@ -255,14 +260,11 @@ document.querySelector('#toggle-mode').addEventListener('click', () => {
 
 3) Wymiana listy elementów:
 ```js
-// Uwaga: setItems wybiera wszystkie wartości (w single zredukuje do 1)
 api.setItems([
   { value: 'it', displayText: 'Italy' },
   { value: 'es', displayText: 'Spain' },
   { value: 'pt', displayText: 'Portugal' },
 ]);
-
-console.log(api.getChosen()); // ["it", "es", "pt"] w multi; ["it"] w single
 ```
 
 4) Disable/Enable i czyszczenie:
@@ -287,10 +289,6 @@ off(); // przestaje nasłuchiwać
 
 - Wartości `value`:
   - Używana jest porównawcza zgodność `===` oraz `Set`. Zalecane prymitywy (string/number/boolean). Unikaj obiektów/funkcji jako `value`.
-- `setItems(...)`:
-  - Obecna implementacja celowo ustawia jako “wybrane” wszystkie nowe wartości. Jeśli chcesz wprowadzić selekcję programatyczną, rozważ:
-    - Wywołać `setItems`, potem `clear()`, a następnie umożliwić użytkownikowi wybór ręcznie (brak publicznego API do “dodaj wyboru” poza interfejsem użytkownika).
-    - Lub rozszerzyć komponent o metodę `setChosen(values)` (wymaga modyfikacji źródła).
 - Lokalizacja:
   - “Brak wyników” i aria-label “Usuń ...” są zakodowane po polsku. Zmień w źródle dla pełnej i18n.
 - Wydajność zdarzeń:
@@ -326,7 +324,9 @@ declare function mountSelectField(
   options?: Options
 ): {
   getChosen(): SelectItem['value'][];
+  setChosen(chosenItems: SelectItem['value'][]);
   setItems(nextItems: SelectItem[]): void;
+  getItems(): { value, displayText }[]
   clear(): void;
   clearSearch(): void;
   focus(): void;
