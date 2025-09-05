@@ -212,14 +212,15 @@
 					type: 'text',
 					placeholder: 'Call center, Sales...',
 					clearErrorOnInput: true,
+					multiple: false,
 					onSelect: () => {
-						fields.jobTitleField.destroy();
-						fields.jobTitleField = mountSelectField('#job-title-field', [], {
-							label: 'Job title',
-							type: 'text',
-							placeholder: 'Select job title...',
-							clearErrorOnInput: true,
-						});
+						fields.jobTitleField.enable();
+						fields.jobTitleField.setItems(jobTitles
+							.filter(jobTitle => jobTitle.company_department_id === fields.companyDepartmentField.getChosen()[0])
+							.map(jobTitle => ({
+								value: jobTitle.id,
+								displayText: jobTitle.name,
+							})));
 					},
 				}),
 				jobTitleField: mountSelectField('#job-title-field', [], {
@@ -227,6 +228,7 @@
 					type: 'text',
 					placeholder: 'Select job title...',
 					clearErrorOnInput: true,
+					multiple: false,
 				}),
 				workedBeforeSwitch: mountCheckbox("#worked-before-switch", { label: "" }),
 				streetField: mountTextField('#street-field', {
