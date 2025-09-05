@@ -39,7 +39,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		placeholder="${escapeHtml(cfg.placeholder)}"
 		autocomplete="off"
 	/>
-	<div class="menu flex-col hidden w-full absolute top-[110%] left-0 max-h-[150px] overflow-auto rounded-xl shadow-lg shadow-black/30"></div>
+	<div class="menu z-10 flex-col hidden w-full absolute top-[110%] left-0 max-h-[150px] overflow-auto rounded-xl shadow-lg shadow-black/30"></div>
 </div>
 `;
 
