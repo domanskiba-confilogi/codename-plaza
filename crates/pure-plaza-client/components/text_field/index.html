@@ -1,160 +1,250 @@
 <!doctype html>
 <html lang="pl">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Przykład użycia mountTextField (Tailwind + Pure JS)</title>
-		<script src="https://cdn.tailwindcss.com"></script>
-	</head>
-	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
-		<header class="mb-8">
-			<h1 class="text-2xl font-semibold">Przykład komponentu TextField</h1>
-			<p class="text-neutral-400">Pure JS + TailwindCSS. Poniżej dwie instancje komponentu.</p>
-		</header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Przykład użycia mountSelectField (Tailwind + Pure JS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+    <header class="mb-8">
+      <h1 class="text-2xl font-semibold">Przykład komponentu SelectField</h1>
+      <p class="text-neutral-400">
+        Pure JS + TailwindCSS. Dwie niezależne instancje z rejestrowaniem zdarzeń i przyciskami akcji.
+      </p>
+      <p class="text-xs text-neutral-500 mt-2">
+        Wybieraj z listy, usuwaj z „chipsów”, Enter wybiera pierwszy dopasowany wynik. setItems nadpisuje aktualny wybór wszystkimi nowymi wartościami.
+      </p>
+    </header>
 
-		<main class="flex flex-col lg:flex-row gap-10">
-			<!-- Instancja 1 -->
-			<section class="space-y-4 w-full">
-				<h2 class="text-lg font-medium">Instancja 1</h2>
+    <main class="flex flex-col lg:flex-row gap-10">
+      <!-- Instancja 1 -->
+      <section class="space-y-4 w-full">
+        <h2 class="text-lg font-medium">Instancja 1 (owoce)</h2>
 
-				<div id="tf1"></div>
+        <div id="sf1"></div>
 
-				<div class="text-sm text-neutral-400">
-					<div>Live onInput: <span id="live1" class="text-neutral-200"></span></div>
-					<div>Typ: <span id="type1" class="text-neutral-200"></span> | Disabled: <span id="disabled1" class="text-neutral-200"></span></div>
-				</div>
+        <div class="text-sm text-neutral-400">
+          <div>Wybrane: <span id="chosen1" class="text-neutral-200"></span></div>
+          <div>Disabled: <span id="disabled1" class="text-neutral-200"></span></div>
+        </div>
 
-				<div class="flex flex-wrap gap-3">
-					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wartość</button>
-					<button id="set1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw wartość "Ala ma kota"</button>
-					<button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
-					<button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
-					<button id="toggleDisabled1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Przełącz disabled</button>
-					<button id="cycleType1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ (text → password → email)</button>
-					<button id="setLabel1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw etykietę</button>
-					<button id="setPlaceholder1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw placeholder</button>
-				</div>
-			</section>
+        <div class="flex flex-wrap gap-3">
+          <button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
+          <button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść wybór</button>
+          <button id="clearSearch1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść wyszukiwarkę</button>
+          <button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+          <button id="toggleDisabled1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Przełącz disabled</button>
+          <button id="loadVeg1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Załaduj „warzywa” (setItems)</button>
+          <button id="loadFruits1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Załaduj „owoce” (setItems)</button>
+        </div>
 
-			<!-- Instancja 2 -->
-			<section class="space-y-4 w-full">
-				<h2 class="text-lg font-medium">Instancja 2</h2>
+        <div class="space-y-2">
+          <h3 class="text-sm font-medium">Log zdarzeń (instancja 1)</h3>
+          <pre id="log1" class="bg-neutral-900/70 ring-1 ring-neutral-800 rounded-lg p-3 text-xs max-h-48 overflow-auto"></pre>
+          <button id="clearLog1" class="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-xs">Wyczyść log</button>
+        </div>
+      </section>
 
-				<div id="tf2"></div>
+      <!-- Instancja 2 -->
+      <section class="space-y-4 w-full">
+        <h2 class="text-lg font-medium">Instancja 2 (miasta, startowo disabled)</h2>
 
-				<div class="text-sm text-neutral-400">
-					<div>Live onInput: <span id="live2" class="text-neutral-200"></span></div>
-					<div>Typ: <span id="type2" class="text-neutral-200"></span> | Disabled: <span id="disabled2" class="text-neutral-200"></span></div>
-				</div>
+        <div id="sf2"></div>
 
-				<div class="flex flex-wrap gap-3">
-					<button id="show2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wartość</button>
-					<button id="set2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw "jan@kowalski.dev"</button>
-					<button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
-					<button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
-					<button id="toPassword2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ na password</button>
-					<button id="toEmail2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień typ na email</button>
-				</div>
-			</section>
-		</main>
+        <div class="text-sm text-neutral-400">
+          <div>Wybrane: <span id="chosen2" class="text-neutral-200"></span></div>
+          <div>Disabled: <span id="disabled2" class="text-neutral-200"></span></div>
+        </div>
 
-		<!-- Udostępnia mountTextField -->
-		<script src="./main.js"></script>
+        <div class="flex flex-wrap gap-3">
+          <button id="show2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
+          <button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść wybór</button>
+          <button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+          <button id="toggleDisabled2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Przełącz disabled</button>
+          <button id="loadCitiesPl2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Załaduj „miasta PL”</button>
+          <button id="loadCitiesEu2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Załaduj „miasta EU”</button>
+          <button id="wireCallbacks2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw onSelect/onRemove</button>
+          <button id="unwireCallbacks2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Usuń onSelect/onRemove</button>
+        </div>
 
-		<script src="../../main.js"></script>
+        <div class="space-y-2">
+          <h3 class="text-sm font-medium">Log zdarzeń (instancja 2)</h3>
+          <pre id="log2" class="bg-neutral-900/70 ring-1 ring-neutral-800 rounded-lg p-3 text-xs max-h-48 overflow-auto"></pre>
+          <button id="clearLog2" class="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-xs">Wyczyść log</button>
+        </div>
+      </section>
+    </main>
 
-		<script>
-		// Montowanie instancji
-		const api1 = mountTextField('#tf1', {
-			type: 'text',
-			label: 'Imię i nazwisko',
-			placeholder: 'Wpisz tekst...',
-			value: '',
-			onInput: (e) => updateLive(1, e.new_value),
-		});
+    <!-- Komponent SelectField -->
+    <script src="/components/select_field/main.js"></script>
 
-		const api2 = mountTextField('#tf2', {
-			type: 'email',
-			label: 'Adres e-mail',
-			placeholder: 'name@example.com',
-			value: '',
-			onInput: (e) => updateLive(2, e.new_value),
-		});
+    <!-- Twój globalny bundle (jeśli potrzebny) -->
+    <script src="/main.js"></script>
 
-		// Pomocnicze: aktualizacja live i metadanych
-		function updateLive(n, val) {
-			document.getElementById('live' + n).textContent = val ?? '';
-			refreshMeta(n);
-		}
+    <script>
+      // Prosty escapeHtml – na wypadek gdyby komponent oczekiwał globalnego helpera
+      window.escapeHtml = window.escapeHtml || function (unsafe) {
+        return String(unsafe)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      };
 
-		function refreshMeta(n) {
-			const api = n === 1 ? api1 : api2;
-			document.getElementById('type' + n).textContent = api.getType();
-			document.getElementById('disabled' + n).textContent = api.isDisabled() ? 'tak' : 'nie';
-		}
+      // Dane przykładowe
+      const fruits = [
+        { value: 'ap', displayText: 'Jabłko' },
+        { value: 'ba', displayText: 'Banan' },
+        { value: 'or', displayText: 'Pomarańcza' },
+        { value: 'ki', displayText: 'Kiwi' },
+        { value: 'ma', displayText: 'Mango' },
+        { value: 'gr', displayText: 'Winogrono' },
+      ];
+      const vegetables = [
+        { value: 'to', displayText: 'Pomidor' },
+        { value: 'og', displayText: 'Ogórek' },
+        { value: 'pa', displayText: 'Papryka' },
+        { value: 'ce', displayText: 'Cebula' },
+      ];
+      const citiesPl = [
+        { value: 'waw', displayText: 'Warszawa' },
+        { value: 'krk', displayText: 'Kraków' },
+        { value: 'gda', displayText: 'Gdańsk' },
+        { value: 'poz', displayText: 'Poznań' },
+        { value: 'wro', displayText: 'Wrocław' },
+      ];
+      const citiesEu = [
+        { value: 'ber', displayText: 'Berlin' },
+        { value: 'par', displayText: 'Paryż' },
+        { value: 'mad', displayText: 'Madryt' },
+        { value: 'rom', displayText: 'Rzym' },
+        { value: 'ams', displayText: 'Amsterdam' },
+      ];
 
-		// Inicjalna aktualizacja meta
-		refreshMeta(1);
-		refreshMeta(2);
+      // Logger
+      function appendLog(n, msg, payload) {
+        const el = document.getElementById('log' + n);
+        const time = new Date().toLocaleTimeString();
+        const line = `[${time}] ${msg}` + (payload ? ' ' + JSON.stringify(payload) : '');
+        el.textContent = line + '\n' + el.textContent;
+      }
+      function refreshMeta(n) {
+        const api = n === 1 ? api1 : api2;
+        document.getElementById('chosen' + n).textContent = JSON.stringify(api.getChosen());
+        document.getElementById('disabled' + n).textContent = api.isDisabled() ? 'tak' : 'nie';
+      }
 
-		// Obsługa przycisków (instancja 1)
-		document.getElementById('show1').addEventListener('click', () => {
-			alert('Wartość (instancja 1): ' + JSON.stringify(api1.getValue()));
-		});
-		document.getElementById('set1').addEventListener('click', () => {
-			api1.setValue('Ala ma kota');
-			refreshMeta(1);
-		});
-		document.getElementById('clear1').addEventListener('click', () => {
-			api1.clear();
-			refreshMeta(1);
-		});
-		document.getElementById('focus1').addEventListener('click', () => {
-			api1.focus();
-		});
-		document.getElementById('toggleDisabled1').addEventListener('click', () => {
-			api1.isDisabled() ? api1.enable() : api1.disable();
-			refreshMeta(1);
-		});
-		document.getElementById('cycleType1').addEventListener('click', () => {
-			const order = ['text', 'password', 'email'];
-			const cur = api1.getType();
-			const next = order[(order.indexOf(cur) + 1) % order.length];
-			api1.setType(next);
-			refreshMeta(1);
-		});
-		document.getElementById('setLabel1').addEventListener('click', () => {
-			const next = prompt('Podaj nową etykietę:', 'Imię i nazwisko (zmienione)');
-			if (next !== null) api1.setLabel(next);
-		});
-		document.getElementById('setPlaceholder1').addEventListener('click', () => {
-			const next = prompt('Podaj nowy placeholder:', 'np. Jan Kowalski');
-			if (next !== null) api1.setPlaceholder(next);
-		});
+      // Montowanie instancji 1 (z callbackami onSelect/onRemove)
+      const api1 = mountSelectField('#sf1', fruits, {
+        label: 'Wybierz owoce',
+        placeholder: 'Szukaj owocu...',
+        onSelect: (e) => {
+          appendLog(1, 'onSelect', e);
+          refreshMeta(1);
+        },
+        onRemove: (e) => {
+          appendLog(1, 'onRemove', e);
+          refreshMeta(1);
+        },
+      });
+      // Dodatkowo nasłuch na change (API eventowe)
+      api1.addEventListener('change', (e) => {
+        appendLog(1, 'event:change', e.detail);
+        refreshMeta(1);
+      });
 
-		// Obsługa przycisków (instancja 2)
-		document.getElementById('show2').addEventListener('click', () => {
-			alert('Wartość (instancja 2): ' + JSON.stringify(api2.getValue()));
-		});
-		document.getElementById('set2').addEventListener('click', () => {
-			api2.setValue('jan@kowalski.dev');
-			refreshMeta(2);
-		});
-		document.getElementById('clear2').addEventListener('click', () => {
-			api2.clear();
-			refreshMeta(2);
-		});
-		document.getElementById('focus2').addEventListener('click', () => {
-			api2.focus();
-		});
-		document.getElementById('toPassword2').addEventListener('click', () => {
-			api2.setType('password');
-			refreshMeta(2);
-		});
-		document.getElementById('toEmail2').addEventListener('click', () => {
-			api2.setType('email');
-			refreshMeta(2);
-		});
-		</script>
-	</body>
+      // Montowanie instancji 2 (bez callbacków, startowo disabled, nasłuch przez API eventowe)
+      const api2 = mountSelectField('#sf2', citiesPl, {
+        label: 'Wybierz miasta',
+        placeholder: 'Szukaj miasta...',
+        disabled: true,
+      });
+      api2.addEventListener('select', (e) => { appendLog(2, 'event:select', e.detail); refreshMeta(2); });
+      api2.addEventListener('remove', (e) => { appendLog(2, 'event:remove', e.detail); refreshMeta(2); });
+      api2.addEventListener('change', (e) => { appendLog(2, 'event:change', e.detail); refreshMeta(2); });
+
+      // Inicjalizacja meta
+      refreshMeta(1);
+      refreshMeta(2);
+
+      // Przyciski instancja 1
+      document.getElementById('show1').addEventListener('click', () => {
+        alert('Wybrane (instancja 1): ' + JSON.stringify(api1.getChosen()));
+      });
+      document.getElementById('clear1').addEventListener('click', () => {
+        api1.clear();
+        refreshMeta(1);
+      });
+      document.getElementById('clearSearch1').addEventListener('click', () => {
+        api1.clearSearch();
+      });
+      document.getElementById('focus1').addEventListener('click', () => {
+        api1.focus();
+      });
+      document.getElementById('toggleDisabled1').addEventListener('click', () => {
+        api1.isDisabled() ? api1.enable() : api1.disable();
+        refreshMeta(1);
+      });
+      document.getElementById('loadVeg1').addEventListener('click', () => {
+        api1.setItems(vegetables);
+        appendLog(1, 'setItems -> vegetables (uwaga: chosen = wszystkie)', { chosen: api1.getChosen() });
+        refreshMeta(1);
+      });
+      document.getElementById('loadFruits1').addEventListener('click', () => {
+        api1.setItems(fruits);
+        appendLog(1, 'setItems -> fruits (uwaga: chosen = wszystkie)', { chosen: api1.getChosen() });
+        refreshMeta(1);
+      });
+      document.getElementById('clearLog1').addEventListener('click', () => {
+        document.getElementById('log1').textContent = '';
+      });
+
+      // Przyciski instancja 2
+      document.getElementById('show2').addEventListener('click', () => {
+        alert('Wybrane (instancja 2): ' + JSON.stringify(api2.getChosen()));
+      });
+      document.getElementById('clear2').addEventListener('click', () => {
+        api2.clear();
+        refreshMeta(2);
+      });
+      document.getElementById('focus2').addEventListener('click', () => {
+        api2.focus();
+      });
+      document.getElementById('toggleDisabled2').addEventListener('click', () => {
+        api2.isDisabled() ? api2.enable() : api2.disable();
+        refreshMeta(2);
+      });
+      document.getElementById('loadCitiesPl2').addEventListener('click', () => {
+        api2.setItems(citiesPl);
+        appendLog(2, 'setItems -> citiesPl (uwaga: chosen = wszystkie)', { chosen: api2.getChosen() });
+        refreshMeta(2);
+      });
+      document.getElementById('loadCitiesEu2').addEventListener('click', () => {
+        api2.setItems(citiesEu);
+        appendLog(2, 'setItems -> citiesEu (uwaga: chosen = wszystkie)', { chosen: api2.getChosen() });
+        refreshMeta(2);
+      });
+      document.getElementById('wireCallbacks2').addEventListener('click', () => {
+        api2.setOnSelect((e) => { appendLog(2, 'onSelect (runtime)', e); refreshMeta(2); });
+        api2.setOnRemove((e) => { appendLog(2, 'onRemove (runtime)', e); refreshMeta(2); });
+        appendLog(2, 'Podpięto onSelect/onRemove przez setOnSelect/setOnRemove');
+      });
+      document.getElementById('unwireCallbacks2').addEventListener('click', () => {
+        api2.setOnSelect(null);
+        api2.setOnRemove(null);
+        appendLog(2, 'Odpięto onSelect/onRemove');
+      });
+      document.getElementById('clearLog2').addEventListener('click', () => {
+        document.getElementById('log2').textContent = '';
+      });
+
+      // Przykład nasłuchu bezpośrednio na elemencie root (CustomEvent, alias bez prefiksu też działa w API)
+      document.querySelector('#sf1').addEventListener('selectfield:select', (e) => {
+        // Dodatkowy log tylko w celach demonstracyjnych
+        appendLog(1, '(root) selectfield:select', e.detail);
+      });
+    </script>
+  </body>
 </html>

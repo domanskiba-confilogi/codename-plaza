@@ -1,11 +1,3 @@
-// Mounts a select-field component into the element matched by selector.
-// Requires TailwindCSS present on the page.
-// Usage:
-//   const api = mountSelectField('#target', [
-//     { value: 1, displayText: 'Apple' },
-//     { value: 2, displayText: 'Banana' },
-//   ], { label: 'Choose fruits', placeholder: 'Search...' });
-
 function mountSelectField(selector, items, options = {}) {
 	const root = document.querySelector(selector);
 
@@ -21,6 +13,9 @@ function mountSelectField(selector, items, options = {}) {
 		label: options.label || 'Select items',
 		placeholder: options.placeholder || 'Search...',
 		id: `select-field-${Math.floor(Math.random() * 1e14)}`,
+		disabled: !!options.disabled,
+		onSelect: typeof options.onSelect === 'function' ? options.onSelect : null,
+		onRemove: typeof options.onRemove === 'function' ? options.onRemove : null,
 	};
 
 	const X_ICON_SVG = `
@@ -58,7 +53,35 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		chosen: [],        // array of values
 		showMenu: false,
 		items: items.slice(),
+		disabled: cfg.disabled,
 	};
+
+	// --- Events helper ---
+	function normalizeEventName(name) {
+		return name.startsWith('selectfield:') ? name : `selectfield:${name}`;
+	}
+
+	function emit(type, value) {
+		const item = state.items.find(i => i.value === value) || { value, displayText: String(value) };
+		const detail = { value, item, chosen: state.chosen.slice() };
+
+		if (type === 'select' && cfg.onSelect) cfg.onSelect(detail);
+		if (type === 'remove' && cfg.onRemove) cfg.onRemove(detail);
+
+		root.dispatchEvent(new CustomEvent(`selectfield:${type}`, { detail }));
+		root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
+	}
+
+	// Helpers
+	function applyDisabledUI() {
+		if (input) input.disabled = !!state.disabled;
+		// Ukryj menu i wyczyść je, gdy disabled
+		if (state.disabled) {
+			state.showMenu = false;
+		}
+		renderChips();
+		renderMenu();
+	}
 
 	function filteredItems() {
 		const q = state.search.toLowerCase().trim();
@@ -69,9 +92,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 
 	function renderChips() {
 		chips.innerHTML = '';
-
 		chips.classList.toggle("hidden", state.chosen.length === 0);
-
 		state.chosen.forEach(val => {
 			const item = state.items.find(i => i.value === val);
 			if (!item) return;
@@ -85,10 +106,12 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 
 			const btn = document.createElement('button');
 			btn.type = 'button';
-			btn.className = 'shrink-0 p-1 rounded hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-yellow-400/60';
+			btn.className = 'shrink-0 p-1 rounded hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:focus:ring-0';
 			btn.setAttribute('aria-label', `Usuń ${item.displayText}`);
 			btn.innerHTML = X_ICON_SVG;
+			btn.disabled = !!state.disabled;
 			btn.addEventListener('click', (e) => {
+				if (state.disabled) return;
 				e.stopPropagation();
 				removeItem(val);
 			});
@@ -101,8 +124,12 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 
 	function renderMenu() {
 		menu.innerHTML = '';
+		// Gdy disabled, menu ma być ukryte i nieaktywne
+		if (state.disabled) {
+			menu.classList.add('hidden');
+			return;
+		}
 		const list = filteredItems();
-
 		if (list.length === 0) {
 			const empty = document.createElement('div');
 			empty.className = 'px-4 py-2 bg-neutral-900 text-neutral-400';
@@ -115,25 +142,29 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 				btn.className = 'text-start w-full px-4 py-2 bg-neutral-900 focus:bg-neutral-800 hover:bg-neutral-800 cursor-pointer';
 				btn.textContent = item.displayText;
 				btn.addEventListener('click', () => {
+					if (state.disabled) return;
 					chooseItem(item.value);
 				});
 				menu.appendChild(btn);
 			});
 		}
-
 		menu.classList.toggle('hidden', !state.showMenu);
 	}
 
 	function chooseItem(value) {
+		if (state.disabled) return;
 		state.chosen.push(value);
 		state.showMenu = false;
 		renderChips();
 		renderMenu();
 		clearSearchInput();
-
 		console.info(`Chosen item with value: ${value}`);
 
+		// Emit after state updated
+		emit('select', value);
+
 		setTimeout(() => {
+			if (state.disabled) return;
 			state.showMenu = true;
 			renderMenu();
 			input && input.focus();
@@ -141,11 +172,14 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	}
 
 	function removeItem(value) {
+		if (state.disabled) return;
 		const idx = state.chosen.indexOf(value);
 		if (idx !== -1) {
 			state.chosen.splice(idx, 1);
 			renderChips();
 			renderMenu();
+			// Emit after state updated
+			emit('remove', value);
 			if (input) input.focus();
 		}
 	}
@@ -157,17 +191,20 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	}
 
 	function onInput(e) {
+		if (state.disabled) return;
 		state.search = e.target.value || '';
 		state.showMenu = true;
 		renderMenu();
 	}
 
 	function onFocus() {
+		if (state.disabled) return;
 		state.showMenu = true;
 		renderMenu();
 	}
 
 	function onClick() {
+		if (state.disabled) return;
 		state.showMenu = true;
 		renderMenu();
 	}
@@ -181,6 +218,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	}
 
 	function onKeyDown(e) {
+		if (state.disabled) return;
 		if (e.key === 'Enter') {
 			const list = filteredItems();
 			if (list.length > 0) {
@@ -199,6 +237,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	input.addEventListener('keydown', onKeyDown);
 
 	// Initial render
+	applyDisabledUI(); // ustawia też input.disabled
 	renderChips();
 	renderMenu();
 
@@ -209,17 +248,39 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			if (!Array.isArray(nextItems)) return;
 			state.items = nextItems.slice();
 			const valuesSet = new Set(state.items.map(i => i.value));
+			// UWAGA: obecna logika nadpisuje chosen wszystkimi dostępnymi wartościami (zachowana zgodnie z pierwowzorem)
 			state.chosen = [...valuesSet];
 			renderChips();
 			renderMenu();
+			// Zmiana zestawu może mieć wpływ na selection – emituje change
+			root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
 		},
 		clear: () => {
+			const removed = state.chosen.slice();
 			state.chosen = [];
 			clearSearchInput();
 			renderChips();
+			renderMenu();
+			// Opcjonalnie: emitujemy remove dla każdego usuniętego elementu
+			removed.forEach(v => emit('remove', v));
 		},
 		clearSearch: clearSearchInput,
-		focus: () => input.focus(),
+		focus: () => { if (!state.disabled) input.focus(); },
+		disable: () => { state.disabled = true; applyDisabledUI(); },
+		enable: () => { state.disabled = false; applyDisabledUI(); },
+		setDisabled: (flag) => { state.disabled = !!flag; applyDisabledUI(); },
+		isDisabled: () => !!state.disabled,
+		// Event API (sugar na CustomEvent)
+		addEventListener: (eventName, handler) => {
+			root.addEventListener(normalizeEventName(eventName), handler);
+			return () => root.removeEventListener(normalizeEventName(eventName), handler);
+		},
+		removeEventListener: (eventName, handler) => {
+			root.removeEventListener(normalizeEventName(eventName), handler);
+		},
+		// Możliwość przeprogramowania callbacków runtime
+		setOnSelect: (fn) => { cfg.onSelect = typeof fn === 'function' ? fn : null; },
+		setOnRemove: (fn) => { cfg.onRemove = typeof fn === 'function' ? fn : null; },
 		destroy: () => {
 			input.removeEventListener('input', onInput);
 			input.removeEventListener('focus', onFocus);
@@ -228,6 +289,5 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			input.removeEventListener('keydown', onKeyDown);
 			root.innerHTML = '';
 		},
-		root,
 	};
 }

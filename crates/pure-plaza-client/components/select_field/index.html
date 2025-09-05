@@ -3,104 +3,210 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Przykład użycia mountSelectField (Tailwind + Pure JS)</title>
+		<title>Przykład użycia mountSelectField – zdarzenia select/remove</title>
 		<script src="https://cdn.tailwindcss.com"></script>
 	</head>
 	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
 		<header class="mb-8">
-			<h1 class="text-2xl font-semibold">Przykład komponentu SelectField</h1>
-			<p class="text-neutral-400">Pure JS + TailwindCSS. Poniżej dwie instancje komponentu.</p>
+			<h1 class="text-2xl font-semibold">Komponent SelectField – demonstracja eventów</h1>
+			<p class="text-neutral-400">
+				Pure JS + TailwindCSS. Dwie instancje prezentujące: callbacks w options, CustomEvent na root oraz API on/off.
+			</p>
 		</header>
 
-		<main class="flex flex-col lg:flex-row gap-10">
-			<!-- Instancja 1 -->
+		<main class="flex flex-col lg:grid lg:grid-cols-2 gap-10">
+			<!-- Instancja 1: callbacks w options -->
 			<section class="space-y-4 w-full">
-				<h2 class="text-lg font-medium">Instancja 1</h2>
+				<h2 class="text-lg font-medium">Instancja 1 (callbacks w options)</h2>
 				<div id="select1"></div>
-				<div class="flex gap-3">
+
+				<div class="flex flex-wrap gap-3">
 					<button id="show1" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
 					<button id="clear1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
 					<button id="focus1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
 					<button id="swap1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Podmień dane</button>
+					<button id="toggleDisabled1" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyłącz</button>
+					<button id="clearLog1" class="ml-auto px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść log</button>
+				</div>
+
+				<div class="space-y-2">
+					<div class="text-sm text-neutral-400">Stan chosen (instancja 1): <span id="state1" class="text-neutral-200">[]</span></div>
+					<div class="rounded-xl ring-1 ring-neutral-800 bg-neutral-950/60">
+						<div class="px-4 py-2 text-sm text-neutral-400">Log zdarzeń (onSelect/onRemove):</div>
+						<div id="log1" class="max-h-52 overflow-auto px-4 py-3 text-xs space-y-1"></div>
+					</div>
 				</div>
 			</section>
 
-			<!-- Instancja 2 -->
+			<!-- Instancja 2: CustomEvent + API.on/off -->
 			<section class="space-y-4 w-full">
-				<h2 class="text-lg font-medium">Instancja 2</h2>
+				<h2 class="text-lg font-medium">Instancja 2 (CustomEvent)</h2>
 				<div id="select2"></div>
-				<div class="flex gap-3">
+
+				<div class="flex flex-wrap gap-3">
 					<button id="show2" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Pokaż wybrane</button>
 					<button id="clear2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść</button>
 					<button id="focus2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Fokus</button>
+					<button id="toggleDisabled2" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyłącz</button>
+					<button id="clearLog2" class="ml-auto px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Wyczyść log</button>
+				</div>
+
+				<div class="space-y-2">
+					<div class="text-sm text-neutral-400">Stan chosen (instancja 2): <span id="state2" class="text-neutral-200">[]</span></div>
+					<div class="rounded-xl ring-1 ring-neutral-800 bg-neutral-950/60">
+						<div class="px-4 py-2 text-sm text-neutral-400">Log zdarzeń (CustomEvent):</div>
+						<div id="log2" class="max-h-52 overflow-auto px-4 py-3 text-xs space-y-1"></div>
+					</div>
 				</div>
 			</section>
-
 		</main>
-		<script src="./main.js"></script>
+
+		<!-- Komponent (nie wstawiaj kodu komponentu tutaj) -->
+		<script src="/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+
+		<!-- Inicjalizacja i demonstracja użycia -->
 		<script>
-// Dane przykładowe
-const fruits = [
-{ value: 1, displayText: 'Jabłko' },
-{ value: 2, displayText: 'Banany' },
-{ value: 3, displayText: 'Czereśnie' },
-{ value: 4, displayText: 'Daktyle' },
-{ value: 5, displayText: 'Elderberry' },
-{ value: 6, displayText: 'Figa' },
-{ value: 7, displayText: 'Winogrona' },
-{ value: 8, displayText: 'Gruszka' },
-];
+		// Dane przykładowe – używaj właściwości displayText (wymagane przez komponent)
+		const fruits = [
+			{ value: 1, displayText: 'Jabłko' },
+			{ value: 2, displayText: 'Banany' },
+			{ value: 3, displayText: 'Czereśnie' },
+			{ value: 4, displayText: 'Daktyle' },
+			{ value: 5, displayText: 'Elderberry' },
+			{ value: 6, displayText: 'Figa' },
+			{ value: 7, displayText: 'Winogrona' },
+			{ value: 8, displayText: 'Gruszka' },
+		];
 
-const cities = [
-{ value: 101, displayText: 'Warszawa' },
-{ value: 102, displayText: 'Kraków' },
-{ value: 103, displayText: 'Gdańsk' },
-{ value: 104, displayText: 'Wrocław' },
-{ value: 105, displayText: 'Poznań' },
-];
+		const cities = [
+			{ value: 101, displayText: 'Warszawa' },
+			{ value: 102, displayText: 'Kraków' },
+			{ value: 103, displayText: 'Gdańsk' },
+			{ value: 104, displayText: 'Wrocław' },
+			{ value: 105, displayText: 'Poznań' },
+		];
 
-// Montowanie instancji
-const api1 = mountSelectField('#select1', fruits, {
-	label: 'Wybierz owoce',
-	placeholder: 'Szukaj owoców...',
-});
+		const tropical = [
+			{ value: 201, displayText: 'Mango' },
+			{ value: 202, displayText: 'Ananas' },
+			{ value: 203, displayText: 'Papaja' },
+			{ value: 204, displayText: 'Marakuja' },
+		];
 
-const api2 = mountSelectField('#select2', cities, {
-	label: 'Wybierz miasto',
-	placeholder: 'Szukaj miasta...',
-});
+		// Utility: prosty logger
+		function logTo(container, type, payload) {
+			const row = document.createElement('div');
+			row.className = 'text-neutral-300';
+			const time = new Date().toLocaleTimeString();
+			row.textContent = `[${time}] ${type}: ${JSON.stringify(payload)}`;
+			container.appendChild(row);
+			container.scrollTop = container.scrollHeight;
+		}
+		function setState(el, arr) {
+			el.textContent = JSON.stringify(arr);
+		}
 
-// Obsługa przycisków (instancja 1)
-document.getElementById('show1').addEventListener('click', () => {
-	alert('Wybrane wartości (instancja 1): ' + JSON.stringify(api1.getChosen()));
-});
-document.getElementById('clear1').addEventListener('click', () => {
-	api1.clear();
-});
-document.getElementById('focus1').addEventListener('click', () => {
-	api1.focus();
-});
-document.getElementById('swap1').addEventListener('click', () => {
-	const tropical = [
-		{ value: 201, displayText: 'Mango' },
-		{ value: 202, displayText: 'Ananas' },
-		{ value: 203, displayText: 'Papaja' },
-		{ value: 204, displayText: 'Marakuja' },
-	];
-	api1.setItems(tropical);
-});
+		// INSTANCJA 1 – callbacks w options
+		const log1 = document.getElementById('log1');
+		const state1 = document.getElementById('state1');
 
-// Obsługa przycisków (instancja 2)
-document.getElementById('show2').addEventListener('click', () => {
-	alert('Wybrane wartości (instancja 2): ' + JSON.stringify(api2.getChosen()));
-});
-document.getElementById('clear2').addEventListener('click', () => {
-	api2.clear();
-});
-document.getElementById('focus2').addEventListener('click', () => {
-	api2.focus();
-});
+		const api1 = mountSelectField('#select1', fruits, {
+			label: 'Wybierz owoce',
+			placeholder: 'Szukaj owoców...',
+			onSelect: ({ value, item, chosen }) => {
+				logTo(log1, 'onSelect', { value, item, chosen });
+				setState(state1, chosen);
+			},
+			onRemove: ({ value, item, chosen }) => {
+				logTo(log1, 'onRemove', { value, item, chosen });
+				setState(state1, chosen);
+			}
+		});
+
+		// Dodatkowo słuchaj ogólnego change (przez CustomEvent) – aktualizacja stanu
+		api1.addEventListener('selectfield:change', (e) => {
+			setState(state1, e.detail.chosen || []);
+		});
+
+		// Przyciski instancji 1
+		document.getElementById('show1').addEventListener('click', () => {
+			alert('Wybrane wartości (instancja 1): ' + JSON.stringify(api1.getChosen()));
+		});
+		document.getElementById('clear1').addEventListener('click', () => {
+			api1.clear();
+		});
+		document.getElementById('focus1').addEventListener('click', () => {
+			api1.focus();
+		});
+		document.getElementById('swap1').addEventListener('click', () => {
+			api1.setItems(tropical);
+		});
+		const toggleDisabled1Btn = document.getElementById('toggleDisabled1');
+		toggleDisabled1Btn.addEventListener('click', () => {
+			if (api1.isDisabled()) {
+				api1.enable();
+				toggleDisabled1Btn.textContent = 'Wyłącz';
+			} else {
+				api1.disable();
+				toggleDisabled1Btn.textContent = 'Włącz';
+			}
+		});
+		document.getElementById('clearLog1').addEventListener('click', () => {
+			log1.innerHTML = '';
+		});
+
+		// INSTANCJA 2 – CustomEvent + API.on/off
+		const log2 = document.getElementById('log2');
+		const state2 = document.getElementById('state2');
+
+		const api2 = mountSelectField('#select2', cities, {
+			label: 'Wybierz miasto',
+			placeholder: 'Szukaj miasta...',
+		});
+
+		// CustomEvent na root (select/remove/change)
+		api2.addEventListener('selectfield:select', (e) => {
+			const { value, item, chosen } = e.detail;
+			logTo(log2, 'CustomEvent select', { value, item, chosen });
+			setState(state2, chosen);
+		});
+		api2.addEventListener('selectfield:remove', (e) => {
+			const { value, item, chosen } = e.detail;
+			logTo(log2, 'CustomEvent remove', { value, item, chosen });
+			setState(state2, chosen);
+		});
+		api2.addEventListener('selectfield:change', (e) => {
+			setState(state2, e.detail.chosen || []);
+		});
+
+		// Przyciski instancji 2
+		document.getElementById('show2').addEventListener('click', () => {
+			alert('Wybrane wartości (instancja 2): ' + JSON.stringify(api2.getChosen()));
+		});
+		document.getElementById('clear2').addEventListener('click', () => {
+			api2.clear();
+		});
+		document.getElementById('focus2').addEventListener('click', () => {
+			api2.focus();
+		});
+		const toggleDisabled2Btn = document.getElementById('toggleDisabled2');
+		toggleDisabled2Btn.addEventListener('click', () => {
+			if (api2.isDisabled()) {
+				api2.enable();
+				toggleDisabled2Btn.textContent = 'Wyłącz';
+			} else {
+				api2.disable();
+				toggleDisabled2Btn.textContent = 'Włącz';
+			}
+		});
+		document.getElementById('clearLog2').addEventListener('click', () => {
+			log2.innerHTML = '';
+		});
+
+		// Start: pokaż początkowy stan (może być pusty)
+		setState(state1, api1.getChosen());
+		setState(state2, api2.getChosen());
 		</script>
 	</body>
 </html>
-

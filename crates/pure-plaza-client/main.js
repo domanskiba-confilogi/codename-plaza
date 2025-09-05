@@ -193,8 +193,8 @@ function createApiConnector(config = {}) {
 	}
 
 	async function getJobTitles() {
-		function result({ ok = null, unauthorizedError = null, unknownError = null }) {
-			return { ok, unauthorizedError, unknownError };
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
 		}
 
 		if (authStore === null) {
@@ -229,12 +229,6 @@ function createApiConnector(config = {}) {
 				});
 			}
 
-			if (res.status === 401) {
-				return result({
-					unauthorizedError: new Error("Unauthorized"),
-				});
-			}
-
 			// inne kody traktujemy jako unknownError
 			const fallbackBody = await parseJsonSafe(res);
 			const err = new Error(`HTTP ${res.status}`);
@@ -250,8 +244,8 @@ function createApiConnector(config = {}) {
 	}
 
 	async function getCompanyDepartments() {
-		function result({ ok = null, unauthorizedError = null, unknownError = null }) {
-			return { ok, unauthorizedError, unknownError };
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
 		}
 
 		if (authStore === null) {
@@ -283,12 +277,6 @@ function createApiConnector(config = {}) {
 				}
 				return result({
 					unknownError: new Error('Unexpected 200 response shape'),
-				});
-			}
-
-			if (res.status === 401) {
-				return result({
-					unauthorizedError: new Error("Unauthorized"),
 				});
 			}
 
@@ -447,9 +435,19 @@ async function checkIsLoggedInMiddleware(authStore) {
 	} else if (result.ok !== null) {
 		authStore.setLoggedInUser(authStore.getAuthorizationToken(), result.ok);
 	} else {
-		const errorModal = mountModal("#event-modal", {
+		const errorModal = mountModal("#error-modal-root", {
 			title: "A critical error occured",
-			contentHtml: `${result.unknownError}`
+			contentHtml: `${result.unknownError}`,
+			primaryAction: { 
+				label: 'Refresh page', 
+				onClick: (_, api) => {
+					window.location.reload();
+				} 
+			},
 		});
+
+		errorModal.open();
+
+		throw result.unknownError;
 	}
 }
