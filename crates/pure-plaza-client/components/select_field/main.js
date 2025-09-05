@@ -54,6 +54,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		showMenu: false,
 		items: items.slice(),
 		disabled: cfg.disabled,
+		multiple: options.multiple !== undefined ? !!options.multiple : true,
 	};
 
 	// --- Events helper ---
@@ -64,18 +65,15 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	function emit(type, value) {
 		const item = state.items.find(i => i.value === value) || { value, displayText: String(value) };
 		const detail = { value, item, chosen: state.chosen.slice() };
-
 		if (type === 'select' && cfg.onSelect) cfg.onSelect(detail);
 		if (type === 'remove' && cfg.onRemove) cfg.onRemove(detail);
-
-		root.dispatchEvent(new CustomEvent(`selectfield:${type}`, { detail }));
+		root.dispatchEvent(new CustomEvent(normalizeEventName(type), { detail }));
 		root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
 	}
 
 	// Helpers
 	function applyDisabledUI() {
 		if (input) input.disabled = !!state.disabled;
-		// Ukryj menu i wyczyść je, gdy disabled
 		if (state.disabled) {
 			state.showMenu = false;
 		}
@@ -124,7 +122,6 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 
 	function renderMenu() {
 		menu.innerHTML = '';
-		// Gdy disabled, menu ma być ukryte i nieaktywne
 		if (state.disabled) {
 			menu.classList.add('hidden');
 			return;
@@ -151,20 +148,52 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		menu.classList.toggle('hidden', !state.showMenu);
 	}
 
+	// NEW: wspólna funkcja do sprowadzenia liczby wybranych do limitu (single mode)
+	function enforceSelectionLimit() {
+		if (state.multiple) return;
+		if (state.chosen.length <= 1) return;
+		const keep = state.chosen[0];
+		const toRemove = state.chosen.slice(1);
+		state.chosen = [keep];
+		renderChips();
+		renderMenu();
+		toRemove.forEach(v => emit('remove', v));
+		root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
+	}
+
 	function chooseItem(value) {
 		if (state.disabled) return;
-		state.chosen.push(value);
+
+		if (!state.multiple) {
+			// Tryb pojedynczy – zastępujemy poprzedni wybór nowym
+			const toRemove = state.chosen.filter(v => v !== value);
+			const isSame = state.chosen.length === 1 && state.chosen[0] === value;
+			state.chosen = [value];
+			state.showMenu = false;
+			renderChips();
+			renderMenu();
+			if (!isSame) {
+				toRemove.forEach(v => emit('remove', v));
+			}
+			console.info(`Chosen item with value: ${value}`);
+			emit('select', value);
+			// W single nie otwieramy natychmiast menu ponownie
+			return;
+		}
+
+		// Tryb wielokrotny
+		if (!state.chosen.includes(value)) {
+			state.chosen.push(value);
+		}
 		state.showMenu = false;
 		renderChips();
 		renderMenu();
-		clearSearchInput();
 		console.info(`Chosen item with value: ${value}`);
-
-		// Emit after state updated
 		emit('select', value);
 
 		setTimeout(() => {
 			if (state.disabled) return;
+			// W multi po wyborze ponownie pokazujemy menu
 			state.showMenu = true;
 			renderMenu();
 			input && input.focus();
@@ -178,7 +207,6 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			state.chosen.splice(idx, 1);
 			renderChips();
 			renderMenu();
-			// Emit after state updated
 			emit('remove', value);
 			if (input) input.focus();
 		}
@@ -237,7 +265,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	input.addEventListener('keydown', onKeyDown);
 
 	// Initial render
-	applyDisabledUI(); // ustawia też input.disabled
+	applyDisabledUI();
 	renderChips();
 	renderMenu();
 
@@ -248,11 +276,14 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			if (!Array.isArray(nextItems)) return;
 			state.items = nextItems.slice();
 			const valuesSet = new Set(state.items.map(i => i.value));
-			// UWAGA: obecna logika nadpisuje chosen wszystkimi dostępnymi wartościami (zachowana zgodnie z pierwowzorem)
+			// Zachowujemy oryginalną logikę – wybrane = wszystkie dostępne wartości
 			state.chosen = [...valuesSet];
+
+			// Jeśli single – zabezpiecz, by został tylko jeden element
+			enforceSelectionLimit();
+
 			renderChips();
 			renderMenu();
-			// Zmiana zestawu może mieć wpływ na selection – emituje change
 			root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
 		},
 		clear: () => {
@@ -261,15 +292,15 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			clearSearchInput();
 			renderChips();
 			renderMenu();
-			// Opcjonalnie: emitujemy remove dla każdego usuniętego elementu
 			removed.forEach(v => emit('remove', v));
 		},
 		clearSearch: clearSearchInput,
-		focus: () => { if (!state.disabled) input.focus(); },
+		focus: () => { if (!state.disabled) input && input.focus(); },
 		disable: () => { state.disabled = true; applyDisabledUI(); },
 		enable: () => { state.disabled = false; applyDisabledUI(); },
 		setDisabled: (flag) => { state.disabled = !!flag; applyDisabledUI(); },
 		isDisabled: () => !!state.disabled,
+
 		// Event API (sugar na CustomEvent)
 		addEventListener: (eventName, handler) => {
 			root.addEventListener(normalizeEventName(eventName), handler);
@@ -278,9 +309,30 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		removeEventListener: (eventName, handler) => {
 			root.removeEventListener(normalizeEventName(eventName), handler);
 		},
+
 		// Możliwość przeprogramowania callbacków runtime
 		setOnSelect: (fn) => { cfg.onSelect = typeof fn === 'function' ? fn : null; },
 		setOnRemove: (fn) => { cfg.onRemove = typeof fn === 'function' ? fn : null; },
+
+		// NEW: przełączanie single/multiple
+		setMultiple: (flag) => {
+			const next = !!flag;
+			if (state.multiple === next) return;
+			state.multiple = next;
+
+			if (!state.multiple) {
+				// Wchodzimy w tryb single – utnij nadmiar i wyemituj remove dla odrzuconych
+				enforceSelectionLimit();
+			} else {
+				// Powrót do multiple – nic specjalnego, odśwież tylko menu
+				renderMenu();
+			}
+		},
+
+		isMultiple: () => {
+			return state.multiple;
+		},
+		// Cleanup
 		destroy: () => {
 			input.removeEventListener('input', onInput);
 			input.removeEventListener('focus', onFocus);
