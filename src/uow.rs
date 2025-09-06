@@ -165,19 +165,44 @@ impl<'a> UnitOfWork<'a> {
         Ok(())
     }
 
-    pub async fn get_external_permissions(&mut self) -> Result<Vec<ExternalPermissionEntity>, sqlx::Error> {
-        sqlx::query_as!(ExternalPermissionEntity, "SELECT * FROM external_permissions").fetch_all(&mut *self.transaction).await
+    pub async fn get_system_permissions(&mut self) -> Result<Vec<SystemPermissionEntity>, sqlx::Error> {
+        sqlx::query_as!(SystemPermissionEntity, "SELECT * FROM system_permissions").fetch_all(&mut *self.transaction).await
+    }
+
+    pub async fn find_system_permission_by_id(&mut self, id: i32) -> Result<Option<SystemPermissionEntity>, sqlx::Error> {
+        sqlx::query_as!(SystemPermissionEntity, "SELECT * FROM system_permissions WHERE id = $1", id).fetch_optional(&mut *self.transaction).await
     }
 
     pub async fn get_mailing_groups(&mut self) -> Result<Vec<MailingGroupEntity>, sqlx::Error> {
         sqlx::query_as!(MailingGroupEntity, "SELECT * FROM mailing_groups").fetch_all(&mut *self.transaction).await
     }
+
+    pub async fn get_licenses(&mut self) -> Result<Vec<LicenseEntity>, sqlx::Error> {
+        sqlx::query_as!(LicenseEntity, "SELECT * FROM licenses").fetch_all(&mut *self.transaction).await
+    }
+
+    pub async fn create_system_permission(&mut self, name: &str, subpermission_of_id: Option<i32>) -> Result<i32, sqlx::Error> {
+        sqlx::query_scalar!(
+            "INSERT INTO system_permissions (name, subpermission_of_id) VALUES ($1, $2) RETURNING id;", 
+            name,
+            subpermission_of_id
+        )
+            .fetch_one(&mut *self.transaction)
+            .await
+    }
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
-pub struct ExternalPermissionEntity {
+pub struct LicenseEntity {
     pub id: i32,
     pub name: String,
+}
+
+#[derive(sqlx::FromRow, Clone, Debug, Default)]
+pub struct SystemPermissionEntity {
+    pub id: i32,
+    pub name: String,
+    pub subpermission_of_id: Option<i32>
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]

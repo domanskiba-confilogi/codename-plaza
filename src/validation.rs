@@ -115,3 +115,26 @@ impl<'a> Validator for LoginValidator<'a> {
         Ok(())
     }
 }
+
+pub struct CreateSystemPermissionValidator<'a> {
+    pub name: &'a str,
+    pub subpermission_of_id: Option<i32>
+}
+
+impl<'a> Validator for CreateSystemPermissionValidator<'a> {
+    fn validate(self) -> Result<(), ValidationError> {
+        StringTooShortValidator {
+            property_name: FieldTranslationKey::SystemPermissionName,
+            value: self.name,
+            min_length: 3
+        }.validate()?;
+
+        StringTooLongValidator {
+            property_name: FieldTranslationKey::SystemPermissionName,
+            value: self.name,
+            max_length: 64
+        }.validate()?;
+
+        Ok(())
+    }
+}

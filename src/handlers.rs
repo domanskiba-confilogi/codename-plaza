@@ -13,7 +13,7 @@ use connector::*;
 use serde_json::json;
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
-use crate::validation::LoginValidator;
+use crate::validation::{LoginValidator, CreateSystemPermissionValidator};
 
 #[debug_handler]
 pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginRequestBody>) -> Result<Response, Response> {
@@ -115,19 +115,6 @@ pub async fn get_job_titles(State(db_pool): State<Pool<Postgres>>) -> Result<Res
     }).collect::<Vec<JobTitleDto>>())).into_response())
 }
 
-pub async fn get_external_permissions(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
-
-    let permissions = uow.get_external_permissions().await.unwrap().into_iter().map(|external_permission| {
-        ExternalPermissionDto {
-            id: external_permission.id,
-            name: external_permission.name,
-        }
-    }).collect::<Vec<ExternalPermissionDto>>();
-
-    Ok((StatusCode::OK, Json(permissions)).into_response())
-}
-
 pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
     let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
 
@@ -140,4 +127,65 @@ pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result
     }).collect::<Vec<MailingGroupDto>>();
 
     Ok((StatusCode::OK, Json(mailing_groups)).into_response())
+}
+
+pub async fn get_licenses(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let licenses = uow.get_licenses().await.unwrap().into_iter().map(|license| {
+        LicenseDto {
+            id: license.id,
+            name: license.name,
+        }
+    }).collect::<Vec<LicenseDto>>();
+
+    Ok((StatusCode::OK, Json(licenses)).into_response())
+}
+
+pub async fn get_system_permissions(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let system_permission = uow.get_system_permissions().await.unwrap().into_iter().map(|system_permission| {
+        SystemPermissionDto {
+            id: system_permission.id,
+            name: system_permission.name,
+            subpermission_of_id: system_permission.subpermission_of_id,
+        }
+    }).collect::<Vec<SystemPermissionDto>>();
+
+    Ok((StatusCode::OK, Json(system_permission)).into_response())
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct CreateSystemPermissionRequest {
+    name: String,
+    subpermission_of_id: Option<i32>,
+}
+
+pub async fn create_system_permission(
+    State(db_pool): State<Pool<Postgres>>, 
+    Json(json): Json<CreateSystemPermissionRequest>
+) -> Result<Response, Response> {
+    if let Err(error) = (CreateSystemPermissionValidator {
+        name: &json.name,
+        subpermission_of_id: json.subpermission_of_id.clone(),
+    }.validate()) {
+        return Err(error.into_with_translation(Language::Polish).into_response());
+    }
+    
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let system_permission_id = uow.create_system_permission(&json.name, json.subpermission_of_id).await.unwrap();
+
+    let system_permission = uow.find_system_permission_by_id(system_permission_id).await.unwrap().map(|system_permission| {
+        SystemPermissionDto {
+            id: system_permission.id,
+            name: system_permission.name,
+            subpermission_of_id: system_permission.subpermission_of_id,
+        }
+    }).expect("newly created system permission to exist");
+
+    uow.commit().await.unwrap();
+
+    Ok((StatusCode::OK, Json(system_permission)).into_response())
 }
