@@ -21,6 +21,19 @@ pub struct ExternalPermissionDto {
     pub name: String
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct SystemPermissionDto {
+    pub id: i32,
+    pub name: String,
+    pub subpermission_of_id: Option<i32>
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct LicenseDto {
+    pub id: i32,
+    pub name: String,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct JobTitleDto {
     pub id: i32,
@@ -151,6 +164,7 @@ pub mod i18n {
     pub enum FieldTranslationKey {
         Email,
         Password,
+        SystemPermissionName,
     }
 
     impl Translate for FieldTranslationKey {
@@ -164,6 +178,11 @@ pub mod i18n {
                 FieldTranslationKey::Password => {
                     match language {
                         Language::Polish => format!("hasło"),
+                    }
+                }
+                FieldTranslationKey::SystemPermissionName => {
+                    match language {
+                        Language::Polish => format!("name"),
                     }
                 }
             }
