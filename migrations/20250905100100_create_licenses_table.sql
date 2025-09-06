@@ -1,0 +1,4 @@
+CREATE TABLE licenses (
+	id	SERIAL PRIMARY KEY,
+	name	VARCHAR(64) UNIQUE,
+);
