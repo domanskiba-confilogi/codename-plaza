@@ -294,7 +294,109 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments };
+	async function getLicenses() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/licenses'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function getSystemPermissions() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/system-permissions'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions };
 }
 
 // High-resolution time when available (browser/Node)
@@ -450,4 +552,21 @@ async function checkIsLoggedInMiddleware(authStore) {
 
 		throw result.unknownError;
 	}
+}
+
+function reportCriticalError(error) {
+	const errorModal = mountModal("#error-modal-root", {
+		title: "A critical error occured",
+		contentHtml: `${error}`,
+		primaryAction: { 
+			label: 'Refresh page', 
+			onClick: (_, api) => {
+				window.location.reload();
+			} 
+		},
+	});
+
+	errorModal.open();
+	
+	throw error;
 }
