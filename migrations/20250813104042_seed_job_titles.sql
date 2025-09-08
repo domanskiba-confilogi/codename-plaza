@@ -1,11 +1,11 @@
 INSERT INTO job_titles (id, name, company_department_id) VALUES 
 	-- call center
-	(2, 'Agent - Team PL', 1),
-	(3, 'Agent - Team CZ', 1),
-	(4, 'Agent - Team SK', 1),
-	(5, 'Agent - Team HR', 1),
-	(6, 'Agent - Team SI', 1),
-	(7, 'Agent - Team BG', 1),
+	(2, 'Agent - Team PL', 1), -- PLP1, PLP2, PLP3, PLBF, RETURN PL
+	(3, 'Agent - Team CZ', 1), -- CZP1, CZP2, CZP3, Return CZ
+	(4, 'Agent - Team SK', 1), -- SKP1, SKP2, SKP3, Return SK
+	(5, 'Agent - Team HR', 1), -- HRP1
+	(6, 'Agent - Team SI', 1), -- SIP1
+	(7, 'Agent - Team BG', 1), -- BGP1
 	(8, 'Team Manager', 1),
 	(10, 'Sales Director', 1),
 
@@ -105,3 +105,26 @@ INSERT INTO job_titles (id, name, company_department_id) VALUES
 	-- Controlling
 	(80, 'Shipping Management Specialist', 14),
 	(81, 'Manager, Logistics Billing & Analysis', 14);
+
+INSERT INTO job_titles (id, name, parent_job_title_id) VALUES
+	(82, 'PLP1', 2),
+	(83, 'PLP2', 2),
+	(84, 'PLP3', 2),
+	(85, 'PLBF', 2),
+	(86, 'Return PL', 2),
+
+	(87, 'CZP1', 3),
+	(88, 'CZP2', 3),
+	(89, 'CZP3', 3),
+	(90, 'Return CZ', 3),
+
+	(91, 'SKP1', 4),
+	(92, 'SKP2', 4),
+	(93, 'SKP3', 4),
+	(94, 'Return SK', 4),
+
+	(95, 'HRP1', 5),
+
+	(96, 'SIP1', 6),
+
+	(97, 'BGP1', 7);
