@@ -69,6 +69,9 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
         })).into_response());
     }
 
+
+    uow.commit().await.unwrap();
+
     return Err(ValidationError {
         property_name: FieldTranslationKey::Email,
         translation: TranslationKey::Validation(ValidationTranslationKey::InvalidCredentials)
@@ -127,6 +130,8 @@ pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result
         }
     }).collect::<Vec<MailingGroupDto>>();
 
+    uow.commit().await.unwrap();
+
     Ok((StatusCode::OK, Json(mailing_groups)).into_response())
 }
 
@@ -140,7 +145,39 @@ pub async fn get_licenses(State(db_pool): State<Pool<Postgres>>) -> Result<Respo
         }
     }).collect::<Vec<LicenseDto>>();
 
+    uow.commit().await.unwrap();
+
     Ok((StatusCode::OK, Json(licenses)).into_response())
+}
+
+pub async fn get_license_to_job_title_mappings(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let license_mappings = uow.get_license_to_job_title_mappings().await.unwrap().into_iter().map(|mapping| {
+        LicenseToJobTitleMappingDto {
+            license_id: mapping.license_id,
+            job_title_id: mapping.job_title_id
+        }
+    }).collect::<Vec<LicenseToJobTitleMappingDto>>();
+
+    uow.commit().await.unwrap();
+
+    Ok((StatusCode::OK, Json(license_mappings)).into_response())
+}
+
+pub async fn get_system_permission_to_job_title_mappings(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+
+    let license_mappings = uow.get_system_permissions_to_job_title_mappings().await.unwrap().into_iter().map(|mapping| {
+        SystemPermissionToJobTitleMappingDto {
+            system_permission_id: mapping.system_permission_id,
+            job_title_id: mapping.job_title_id
+        }
+    }).collect::<Vec<SystemPermissionToJobTitleMappingDto>>();
+
+    uow.commit().await.unwrap();
+
+    Ok((StatusCode::OK, Json(license_mappings)).into_response())
 }
 
 pub async fn get_system_permissions(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
@@ -153,6 +190,8 @@ pub async fn get_system_permissions(State(db_pool): State<Pool<Postgres>>) -> Re
             subpermission_of_id: system_permission.subpermission_of_id,
         }
     }).collect::<Vec<SystemPermissionDto>>();
+
+    uow.commit().await.unwrap();
 
     Ok((StatusCode::OK, Json(system_permission)).into_response())
 }

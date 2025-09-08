@@ -181,6 +181,14 @@ impl<'a> UnitOfWork<'a> {
         sqlx::query_as!(LicenseEntity, "SELECT * FROM licenses").fetch_all(&mut *self.transaction).await
     }
 
+    pub async fn get_license_to_job_title_mappings(&mut self) -> Result<Vec<LicenseToJobTitleMappingEntity>, sqlx::Error> {
+        sqlx::query_as!(LicenseToJobTitleMappingEntity, "SELECT * FROM job_titles_have_strict_onboarding_license_mappings").fetch_all(&mut *self.transaction).await
+    }
+
+    pub async fn get_system_permissions_to_job_title_mappings(&mut self) -> Result<Vec<SystemPermissionToJobTitleMappingEntity>, sqlx::Error> {
+        sqlx::query_as!(SystemPermissionToJobTitleMappingEntity, "SELECT * FROM job_titles_have_strict_onboarding_system_permissions_mappings").fetch_all(&mut *self.transaction).await
+    }
+
     pub async fn create_system_permission(&mut self, name: &str, subpermission_of_id: Option<i32>) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
             "INSERT INTO system_permissions (name, subpermission_of_id) VALUES ($1, $2) RETURNING id;", 
@@ -211,6 +219,18 @@ pub struct JobTitleEntity {
     pub name: String,
     pub company_department_id: Option<i32>,
     pub parent_job_title_id: Option<i32>,
+}
+
+#[derive(sqlx::FromRow, Clone, Debug, Default)]
+pub struct LicenseToJobTitleMappingEntity {
+    pub license_id: i32,
+    pub job_title_id: i32,
+}
+
+#[derive(sqlx::FromRow, Clone, Debug, Default)]
+pub struct SystemPermissionToJobTitleMappingEntity {
+    pub system_permission_id: i32,
+    pub job_title_id: i32,
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
