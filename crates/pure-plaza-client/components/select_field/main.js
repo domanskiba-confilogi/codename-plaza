@@ -96,11 +96,11 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			if (!item) return;
 
 			const chip = document.createElement('div');
-			chip.className = 'px-3 py-1.5 rounded bg-neutral-950/60 ring-1 ring-inset ring-neutral-800 flex flex-row gap-2 justify-center items-center group/item cursor-default';
+			chip.className = 'px-3 py-1.5 rounded bg-neutral-950/60 ring-1 ring-inset ring-neutral-800 flex flex-row gap-2 justify-center items-center group/item cursor-default overflow-hidden';
 
 			const label = document.createElement('span');
 			label.textContent = item.displayText;
-			label.className = 'select-none';
+			label.className = 'select-none truncate';
 
 			const btn = document.createElement('button');
 			btn.type = 'button';
@@ -129,14 +129,14 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		const list = filteredItems();
 		if (list.length === 0) {
 			const empty = document.createElement('div');
-			empty.className = 'px-4 py-2 bg-neutral-900 text-neutral-400';
+			empty.className = 'px-4 py-2 bg-neutral-900 text-neutral-400 overflow-hidden';
 			empty.textContent = 'Brak wyników';
 			menu.appendChild(empty);
 		} else {
 			list.forEach(item => {
 				const btn = document.createElement('button');
 				btn.type = 'button';
-				btn.className = 'text-start w-full px-4 py-2 bg-neutral-900 focus:bg-neutral-800 hover:bg-neutral-800 cursor-pointer';
+				btn.className = 'text-start w-full px-4 py-2 bg-neutral-900 focus:bg-neutral-800 hover:bg-neutral-800 cursor-pointer truncate';
 				btn.textContent = item.displayText;
 				btn.addEventListener('click', () => {
 					if (state.disabled) return;

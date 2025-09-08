@@ -396,7 +396,58 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions };
+	async function getMailingGroups() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/mailing-groups'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ ok: data });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups };
 }
 
 // High-resolution time when available (browser/Node)

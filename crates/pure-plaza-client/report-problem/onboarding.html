@@ -40,9 +40,10 @@
 							<div id="last-name-field"></div>
 						</div>
 
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 							<div id="company-department-field"></div>
 							<div id="job-title-field"></div>
+							<div class="md:col-span-2 lg:col-span-1" id="job-subtitle-field"></div>
 						</div>
 					</section>
 
@@ -122,12 +123,14 @@
 					jobTitles,
 					companyDepartments,
 					licenses,
-					systemPermissions
+					systemPermissions,
+					mailingGroups
 				] = await Promise.all([
 						apiConnector.getJobTitles(),
 						apiConnector.getCompanyDepartments(),
 						apiConnector.getLicenses(),
-						apiConnector.getSystemPermissions()
+						apiConnector.getSystemPermissions(),
+						apiConnector.getMailingGroups(),
 					]).then(result => {
 						for (oneResult of result) {
 							if (oneResult.unknownError !== null) {
@@ -140,7 +143,7 @@
 					}).catch(reportCriticalError);
 
 				// TODO: Remove these console logs
-				console.log(jobTitles, companyDepartments, licenses, systemPermissions);
+				console.log(jobTitles, companyDepartments, licenses, systemPermissions, mailingGroups);
 
 				loadingScreen.destroy();
 
@@ -204,10 +207,32 @@
 										value: jobTitle.id,
 										displayText: jobTitle.name,
 									})));
+
+								fields.jobSubtitleField.disable();
+								fields.jobSubtitleField.setItems([]);
 							},
 						}),
 					jobTitleField: mountSelectField('#job-title-field', [], {
 						label: 'Job title',
+						type: 'text',
+						placeholder: 'Select job title...',
+						clearErrorOnInput: true,
+						multiple: false,
+						onSelect: () => {
+							fields.jobSubtitleField.setItems(jobTitles
+								.filter(jobTitle => jobTitle.parent_job_title_id === fields.jobTitleField.getChosen()[0])
+								.map(jobTitle => ({
+									value: jobTitle.id,
+									displayText: jobTitle.name,
+								})));
+
+							if (fields.jobSubtitleField.getItems().length > 0) {
+								fields.jobSubtitleField.enable();
+							}
+						},
+					}),
+					jobSubtitleField: mountSelectField('#job-subtitle-field', [], {
+						label: 'Job Subtitle',
 						type: 'text',
 						placeholder: 'Select job title...',
 						clearErrorOnInput: true,
@@ -284,12 +309,13 @@
 							label: "Licenses",
 							placeholder: "Office on desktop, PowerBI Pro, etc.",
 						}),
-					groupsField: mountSelectField("#groups-field", [
-						{ value: "", displayText: "" },
-					], {
-							label: "Groups",
-							placeholder: "e.g., CZ-SK Managers"
-						}),
+					groupsField: mountSelectField("#groups-field", mailingGroups.map(mailingGroup => ({
+						value: mailingGroup.id,
+						displayText: `${mailingGroup.name} (${mailingGroup.email})`
+					})), {
+						label: "Groups",
+						placeholder: "e.g., CZ-SK Managers"
+					}),
 					cancelBtn: mountButton('#cancel-btn', {
 						label: 'Cancel',
 						variant: 'ghost',
@@ -322,6 +348,7 @@
 				// { value: "ovh-replica", displayText: "Database replication of Vici HR" },
 
 				fields.jobTitleField.disable();
+				fields.jobSubtitleField.disable();
 
 				// Submit button: render as <button type="submit">
 				const submitBtn = mountButton('#submit-btn', {
