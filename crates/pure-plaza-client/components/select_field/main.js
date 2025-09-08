@@ -161,7 +161,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		root.dispatchEvent(new CustomEvent('selectfield:change', { detail: { chosen: state.chosen.slice() } }));
 	}
 
-	function chooseItem(value) {
+	function chooseItem(value, focusAfterAction = true) {
 		if (state.disabled) return;
 
 		if (!state.multiple) {
@@ -196,11 +196,11 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			// W multi po wyborze ponownie pokazujemy menu
 			state.showMenu = true;
 			renderMenu();
-			input && input.focus();
+			if (focusAfterAction && input) input.focus();
 		}, 50);
 	}
 
-	function removeItem(value) {
+	function removeItem(value, focusAfterAction = true) {
 		if (state.disabled) return;
 		const idx = state.chosen.indexOf(value);
 		if (idx !== -1) {
@@ -208,7 +208,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 			renderChips();
 			renderMenu();
 			emit('remove', value);
-			if (input) input.focus();
+			if (focusAfterAction && input) input.focus();
 		}
 	}
 
@@ -275,9 +275,9 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		setChosen: (newItems) => {
 			if (!Array.isArray(newItems)) return;
 
-			state.chosen.forEach(chosenItem => removeItem(chosenItem));
+			state.chosen.forEach(chosenItem => removeItem(chosenItem, false));
 
-			newItems.forEach(chosenItem => chooseItem(chosenItem));
+			newItems.forEach(chosenItem => chooseItem(chosenItem, false));
 
 			enforceSelectionLimit();
 
@@ -289,7 +289,7 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		setItems: (nextItems) => {
 			if (!Array.isArray(nextItems)) return;
 
-			state.chosen.forEach(chosenItem => removeItem(chosenItem));
+			state.chosen.forEach(chosenItem => removeItem(chosenItem, false));
 
 			state.items = nextItems.slice();
 

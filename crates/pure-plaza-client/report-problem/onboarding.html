@@ -174,6 +174,41 @@
 					}[s]));
 				}
 
+				function setRequiredLicenses() {
+					let result = [];
+
+					fields.licensesField.setChosen(
+						licenseToJobTitleMappings
+							.filter(mapping => mapping.jobTitleId === fields.jobTitleField.getChosen()[0])
+							.map(mapping => mapping.licenseId)
+					);
+
+					if (fields.jobTitleField.getChosen().length > 0) {
+						result = result.concat(
+							licenseToJobTitleMappings
+								.filter(mapping => mapping.jobTitleId === fields.jobTitleField.getChosen()[0])
+								.map(mapping => mapping.licenseId)
+						);
+					}
+
+					if (fields.jobSubtitleField.getChosen().length > 0) {
+						result = result.concat(
+							licenseToJobTitleMappings
+								.filter(mapping => mapping.jobTitleId === fields.jobSubtitleField.getChosen()[0])
+								.map(mapping => mapping.licenseId)
+						);
+					}
+
+					fields.licensesField.enable();
+					fields.licensesField.setChosen(result);
+
+					if (fields.licensesField.getChosen().length > 0) {
+						fields.licensesField.disable();
+					} else {
+						fields.licensesField.enable();
+					}
+				}
+
 				function setRequiredSystemPermissions() {
 					let result = [];
 
@@ -255,12 +290,6 @@
 						clearErrorOnInput: true,
 						multiple: false,
 						onSelect: () => {
-							fields.licensesField.setChosen(
-								licenseToJobTitleMappings
-									.filter(mapping => mapping.jobTitleId === fields.jobTitleField.getChosen()[0])
-									.map(mapping => mapping.licenseId)
-							);
-
 							fields.jobSubtitleField.setItems(jobTitles
 								.filter(jobTitle => jobTitle.parent_job_title_id === fields.jobTitleField.getChosen()[0])
 								.map(jobTitle => ({
@@ -268,19 +297,17 @@
 									displayText: jobTitle.name,
 								})));
 
-							setRequiredSystemPermissions();
-
 							if (fields.jobSubtitleField.getItems().length > 0) {
 								fields.jobSubtitleField.enable();
 							}
+
+							setRequiredLicenses();
+							setRequiredSystemPermissions();
 						},
 						onRemove: () => {
-							console.log(1);
 							fields.jobSubtitleField.setChosen([]);
 
-							fields.licensesField.setChosen([]);
-							fields.licensesField.enable();
-
+							setRequiredLicenses();
 							setRequiredSystemPermissions();
 						}
 					}),
@@ -291,20 +318,11 @@
 						clearErrorOnInput: true,
 						multiple: false,
 						onSelect: () => {
-							fields.licensesField.setChosen(
-								licenseToJobTitleMappings
-									.filter(mapping => mapping.jobTitleId === fields.jobSubtitleField.getChosen()[0])
-									.map(mapping => mapping.licenseId)
-							);
-							fields.licensesField.disable();
-
+							setRequiredLicenses();
 							setRequiredSystemPermissions();
 						},
 						onRemove: () => {
-							console.log(2);
-							fields.licensesField.setChosen([]);
-							fields.licensesField.enable();
-
+							setRequiredLicenses();
 							setRequiredSystemPermissions();
 						}
 					}),
