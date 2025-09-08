@@ -124,13 +124,17 @@
 					companyDepartments,
 					licenses,
 					systemPermissions,
-					mailingGroups
+					mailingGroups,
+					licenseToJobTitleMappings,
+					systemPermissionToJobTitleMappings
 				] = await Promise.all([
 						apiConnector.getJobTitles(),
 						apiConnector.getCompanyDepartments(),
 						apiConnector.getLicenses(),
 						apiConnector.getSystemPermissions(),
 						apiConnector.getMailingGroups(),
+						apiConnector.getLicenseToJobTitleMappings(),
+						apiConnector.getSystemPermissionToJobTitleMappings(),
 					]).then(result => {
 						for (oneResult of result) {
 							if (oneResult.unknownError !== null) {
@@ -143,7 +147,7 @@
 					}).catch(reportCriticalError);
 
 				// TODO: Remove these console logs
-				console.log(jobTitles, companyDepartments, licenses, systemPermissions, mailingGroups);
+				console.log(jobTitles, companyDepartments, licenses, systemPermissions, mailingGroups, licenseToJobTitleMappings);
 
 				loadingScreen.destroy();
 
@@ -164,6 +168,34 @@
 					return String(str).replace(/[&<>"']/g, s => ({
 						'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 					}[s]));
+				}
+
+				function setRequiredSystemPermissions() {
+					let result = [];
+
+					if (fields.jobTitleField.getChosen().length > 0) {
+						result = result.concat(
+							systemPermissionToJobTitleMappings
+							.filter(systemPermission => systemPermission.jobTitleId === fields.jobTitleField.getChosen()[0])
+							.map(systemPermission => systemPermission.systemPermissionId)
+						);
+					}
+
+					if (fields.jobSubtitleField.getChosen().length > 0) {
+						result = result.concat(
+							systemPermissionToJobTitleMappings
+							.filter(systemPermission => systemPermission.jobTitleId === fields.jobSubtitleField.getChosen()[0])
+							.map(systemPermission => systemPermission.systemPermissionId)
+						);
+					}
+
+					fields.masterSystemsField.setChosen(result);
+
+					if (fields.masterSystemsField.getChosen().length > 0) {
+						fields.masterSystemsField.disable();
+					} else {
+						fields.masterSystemsField.enable();
+					}
 				}
 
 				const fields = {
@@ -209,7 +241,6 @@
 									})));
 
 								fields.jobSubtitleField.disable();
-								fields.jobSubtitleField.setItems([]);
 							},
 						}),
 					jobTitleField: mountSelectField('#job-title-field', [], {
@@ -219,6 +250,12 @@
 						clearErrorOnInput: true,
 						multiple: false,
 						onSelect: () => {
+							fields.licensesField.setChosen(
+								licenseToJobTitleMappings
+									.filter(mapping => mapping.jobTitleId === fields.jobTitleField.getChosen()[0])
+									.map(mapping => mapping.licenseId)
+							);
+
 							fields.jobSubtitleField.setItems(jobTitles
 								.filter(jobTitle => jobTitle.parent_job_title_id === fields.jobTitleField.getChosen()[0])
 								.map(jobTitle => ({
@@ -226,10 +263,20 @@
 									displayText: jobTitle.name,
 								})));
 
+							setRequiredSystemPermissions();
+
 							if (fields.jobSubtitleField.getItems().length > 0) {
 								fields.jobSubtitleField.enable();
 							}
 						},
+						onRemove: () => {
+							setRequiredSystemPermissions();
+
+							fields.jobSubtitleField.setChosen([]);
+
+							fields.licensesField.setChosen([]);
+							fields.licensesField.enable();
+						}
 					}),
 					jobSubtitleField: mountSelectField('#job-subtitle-field', [], {
 						label: 'Job Subtitle',
@@ -237,6 +284,22 @@
 						placeholder: 'Select job title...',
 						clearErrorOnInput: true,
 						multiple: false,
+						onSelect: () => {
+							fields.licensesField.setChosen(
+								licenseToJobTitleMappings
+									.filter(mapping => mapping.jobTitleId === fields.jobSubtitleField.getChosen()[0])
+									.map(mapping => mapping.licenseId)
+							);
+							fields.licensesField.disable();
+
+							setRequiredSystemPermissions();
+						},
+						onRemove: () => {
+							setRequiredSystemPermissions();
+
+							fields.licensesField.setChosen([]);
+							fields.licensesField.enable();
+						}
 					}),
 					workedBeforeSwitch: mountCheckbox("#worked-before-switch", { label: "" }),
 					streetField: mountTextField('#street-field', {
@@ -295,14 +358,14 @@
 						value: '',
 						clearErrorOnInput: true,
 					}),
-					requestedMasterSystemsField: mountSelectField("#master-systems-field", systemPermissions.map(masterSystem => ({
+					masterSystemsField: mountSelectField("#master-systems-field", systemPermissions.map(masterSystem => ({
 						value: masterSystem.id,
 						displayText: masterSystem.name,
 					})), {
 							label: "Master systems",
 							placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
 						}),
-					requestedLicensesField: mountSelectField("#licenses-field", licenses.map(license => ({
+					licensesField: mountSelectField("#licenses-field", licenses.map(license => ({
 						value: license.id,
 						displayText: license.name,
 					})), {
@@ -313,9 +376,9 @@
 						value: mailingGroup.id,
 						displayText: `${mailingGroup.name} (${mailingGroup.email})`
 					})), {
-						label: "Groups",
-						placeholder: "e.g., CZ-SK Managers"
-					}),
+							label: "Groups",
+							placeholder: "e.g., CZ-SK Managers"
+						}),
 					cancelBtn: mountButton('#cancel-btn', {
 						label: 'Cancel',
 						variant: 'ghost',
@@ -326,26 +389,6 @@
 					})
 				};
 
-				// Master systems
-				// { value: "vici-pl", displayText: "Vici PL" },
-				// { value: "vici-cz", displayText: "Vici CZ" },
-				// { value: "vici-sk", displayText: "Vici SK" },
-				// { value: "vici-bg", displayText: "Vici BG" },
-				// { value: "vici-si", displayText: "Vici SI" },
-				// { value: "vici-hr", displayText: "Vici HR" },
-				//
-				// { value: "crm-pl", displayText: "CRM PL" },
-				// { value: "crm-cz", displayText: "CRM CZ" },
-				// { value: "crm-sk", displayText: "CRM SK" },
-				// { value: "crm-bg", displayText: "CRM BG" },
-				// { value: "crm-si", displayText: "CRM SI" },
-				// { value: "crm-hr", displayText: "CRM HR" },
-				//
-				// { value: "optima", displayText: "Optima" },
-				//
-				// { value: "nettel-replica-pl", displayText: "Database replication of Vici PL" },
-				// { value: "nettel-replica-eu", displayText: "Database replication of Vici CZ/SK/BG/SI" },
-				// { value: "ovh-replica", displayText: "Database replication of Vici HR" },
 
 				fields.jobTitleField.disable();
 				fields.jobSubtitleField.disable();
