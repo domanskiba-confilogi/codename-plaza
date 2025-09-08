@@ -80,13 +80,17 @@
 					<!-- Basic data -->
 					<section class="mb-8">
 						<h2 class="text-lg font-semibold mb-4">Requested permissions</h2>
-						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 							<div id="master-systems-field"></div>
 							<div id="licenses-field"></div>
 							<div id="groups-field"></div>
 						</div>
+						<div id="subpermissions-wrapper" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+						</div>
 					</section>
 
+					<section class="mb-8">
+					</section>
 				</form>
 
 				<!-- Actions -->
@@ -189,6 +193,7 @@
 						);
 					}
 
+					fields.masterSystemsField.enable();
 					fields.masterSystemsField.setChosen(result);
 
 					if (fields.masterSystemsField.getChosen().length > 0) {
@@ -270,12 +275,13 @@
 							}
 						},
 						onRemove: () => {
-							setRequiredSystemPermissions();
-
+							console.log(1);
 							fields.jobSubtitleField.setChosen([]);
 
 							fields.licensesField.setChosen([]);
 							fields.licensesField.enable();
+
+							setRequiredSystemPermissions();
 						}
 					}),
 					jobSubtitleField: mountSelectField('#job-subtitle-field', [], {
@@ -295,10 +301,11 @@
 							setRequiredSystemPermissions();
 						},
 						onRemove: () => {
-							setRequiredSystemPermissions();
-
+							console.log(2);
 							fields.licensesField.setChosen([]);
 							fields.licensesField.enable();
+
+							setRequiredSystemPermissions();
 						}
 					}),
 					workedBeforeSwitch: mountCheckbox("#worked-before-switch", { label: "" }),
@@ -358,12 +365,54 @@
 						value: '',
 						clearErrorOnInput: true,
 					}),
-					masterSystemsField: mountSelectField("#master-systems-field", systemPermissions.map(masterSystem => ({
-						value: masterSystem.id,
-						displayText: masterSystem.name,
-					})), {
+					masterSystemsField: mountSelectField("#master-systems-field", 
+						systemPermissions
+							.filter(systemPermission => systemPermission.subpermission_of_id === null)
+							.map(masterSystem => ({
+								value: masterSystem.id,
+								displayText: masterSystem.name,
+							})
+						), {
 							label: "Master systems",
 							placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
+							onSelect: () => {
+								fields.subpermissions.forEach(subpermissionField => subpermissionField.destroy());
+								fields.subpermissions = [];
+
+								document.querySelector("#subpermissions-wrapper").innerHTML = '';
+
+								const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
+
+								subpermissions.forEach(subpermission => {
+									const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
+
+									const singleCheckboxWrapper = document.createElement("div");
+									singleCheckboxWrapper.id = id;
+
+									document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
+									fields.subpermissions.push(mountCheckbox(`#${id}`, { label: subpermission.name, trueLabel: null, falseLabel: null }));
+								});
+							},
+							onRemove: () => {
+								console.log(3);
+
+								fields.subpermissions.forEach(subpermissionField => subpermissionField.destroy());
+								fields.subpermissions = [];
+
+								document.querySelector("#subpermissions-wrapper").innerHTML = '';
+
+								const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
+
+								subpermissions.forEach(subpermission => {
+									const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
+
+									const singleCheckboxWrapper = document.createElement("div");
+									singleCheckboxWrapper.id = id;
+
+									document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
+									fields.subpermissions.push(mountCheckbox(`#${id}`, { label: subpermission.name, trueLabel: null, falseLabel: null }));
+								});
+							}
 						}),
 					licensesField: mountSelectField("#licenses-field", licenses.map(license => ({
 						value: license.id,
@@ -386,7 +435,8 @@
 						onClick: () => {
 							window.location.href = '/report-problem.html';
 						}
-					})
+					}),
+					subpermissions: []
 				};
 
 

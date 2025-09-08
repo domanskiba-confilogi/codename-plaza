@@ -272,10 +272,12 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 	// Public API
 	return {
 		getChosen: () => state.chosen.slice(),
-		setChosen: (chosenItems) => {
-			if (!Array.isArray(chosenItems)) return;
+		setChosen: (newItems) => {
+			if (!Array.isArray(newItems)) return;
 
-			state.chosen = chosenItems.slice();
+			state.chosen.forEach(chosenItem => removeItem(chosenItem));
+
+			newItems.forEach(chosenItem => chooseItem(chosenItem));
 
 			enforceSelectionLimit();
 
@@ -286,7 +288,9 @@ stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		},
 		setItems: (nextItems) => {
 			if (!Array.isArray(nextItems)) return;
-			state.chosen = [];
+
+			state.chosen.forEach(chosenItem => removeItem(chosenItem));
+
 			state.items = nextItems.slice();
 
 			// Jeśli single – zabezpiecz, by został tylko jeden element
