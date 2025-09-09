@@ -4,9 +4,7 @@
 		<meta charset="utf-8" />
 		<title>Confilogi IT Support - Report onboarding</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<!-- Tailwind CSS (CDN) -->
-		<script src="https://cdn.tailwindcss.com"></script>
-		<link rel="stylesheet" href="/tailwind.js" />
+		<link rel="stylesheet" href="/tailwind.css">
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
 		<div id="error-modal-root"></div>
@@ -95,6 +93,8 @@
 									<div id="hardware-usb-c-network-card-checkbox-root"></div>
 									<div id="hardware-usb-a-wireless-network-card-checkbox-root"></div>
 									<div id="hardware-laptop-bag-checkbox-root"></div>
+									<div id="hardware-phone-checkbox-root"></div>
+									<div id="hardware-phone-charger-checkbox-root"></div>
 								</div>
 							</div>
 							<!-- Toggle -->
@@ -468,6 +468,12 @@
 					hardwareLaptopBagField: mountCheckbox("#hardware-laptop-bag-checkbox-root", {
 						label: "Laptop bag"
 					}),
+					hardwarePhoneField: mountCheckbox("#hardware-phone-checkbox-root", {
+						label: "Phone"
+					}),
+					hardwarePhoneChargerField: mountCheckbox("#hardware-phone-charger-checkbox-root", {
+						label: "Phone charger"
+					}),
 					masterSystemsField: mountSelectField(
 						"#master-systems-field", 
 						masterSystems, 
@@ -566,7 +572,9 @@
 					if (fields.hardwareHeadsetField.getValue()) payload.hardware.push('headset');
 					if (fields.hardwareUsbCNetworkCardField.getValue()) payload.hardware.push('usb-c-network-card');
 					if (fields.hardwareUsbAWirelessNetworkCardField.getValue()) payload.hardware.push('usb-a-wireless-network-card');
-					if (fields.hardwareLaptopBagField.getValue()) fields.hardware.push('laptop-bag');
+					if (fields.hardwareLaptopBagField.getValue()) payload.hardware.push('laptop-bag');
+					if (fields.hardwarePhoneField.getValue()) payload.hardware.push('phone');
+					if (fields.hardwarePhoneChargerField.getValue()) payload.hardware.push('phone-charger');
 
 					payload.permissions = fields.masterSystemsField.getChosen();
 

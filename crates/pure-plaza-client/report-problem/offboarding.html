@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Confilogi IT Support - Report offboarding</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/tailwind.css">
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
+		<div id="loading-screen"></div>
+
+		<!-- Navbar -->
+		<div data-loading="show" class="hidden" id="navbar-root"></div>
+
+		<!-- Main -->
+		<main data-loading="show" class="flex-1 hidden">
+			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+				<!-- Page header -->
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+					<div>
+						<h1 class="text-xl sm:text-2xl font-semibold">Report offboarding</h1>
+						<p class="text-neutral-400 text-sm">Provide basic information about the person and their postal address.</p>
+					</div>
+					<div class="text-xs text-neutral-500">
+						All fields are required unless marked as optional
+					</div>
+				</div>
+
+				<!-- Form card -->
+				<form id="address-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-6">
+					<!-- Basic data -->
+					<section class="mb-8">
+						<h2 class="text-lg font-semibold mb-4">Basic data</h2>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+							<div id="first-name-field"></div>
+							<div id="second-name-field"></div>
+							<div id="last-name-field"></div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+							<div id="company-department-field"></div>
+							<div id="job-title-field"></div>
+							<div class="md:col-span-2 lg:col-span-1" id="job-subtitle-field"></div>
+						</div>
+					</section>
+
+					<!-- Postal Address -->
+					<section>
+						<h2 class="text-lg font-semibold mb-4">Postal address</h2>
+						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+							<div id="street-field"></div>
+							<div id="house-number-field"></div>
+							<div id="apartment-number-field"></div>
+							<div id="country-field"></div>
+							<div id="city-field"></div>
+							<div id="postal-code-field"></div>
+							<div id="phone-field"></div>
+							<div id="email-field"></div>
+						</div>
+					</section>
+				</form>
+
+				<!-- Actions -->
+				<div class="flex items-center justify-end gap-3">
+					<div id="cancel-btn"></div>
+					<div id="submit-btn"></div>
+				</div>
+			</section>
+		</main>
+
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/checkbox_field/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
+
+		<script>
+		const authStore = createAuthStore();
+
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
+
+		const apiConnector = createApiConnector();
+
+		(async () => {
+			try {
+				await checkIsLoggedInMiddleware(authStore);
+
+				loadingScreen.destroy();
+
+				Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(element => {
+					element.classList.remove("hidden");
+				});
+
+				// Navbar
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
+
+				const fields = {
+					firstNameField: mountTextField('#first-name-field', {
+						label: 'Name',
+						type: 'text',
+						placeholder: 'Enter name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					secondNameField: mountTextField('#second-name-field', {
+						label: 'Second name (optional)',
+						type: 'text',
+						placeholder: 'Enter second name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					lastNameField: mountTextField('#last-name-field', {
+						label: 'Surname',
+						type: 'text',
+						placeholder: 'Enter surname...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					streetField: mountTextField('#street-field', {
+						label: 'Street name',
+						type: 'text',
+						placeholder: 'e.g., Main Street',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					houseNumberField: mountTextField('#house-number-field', {
+						label: 'House number',
+						type: 'text',
+						placeholder: 'e.g., 12A',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					apartmentNumberField: mountTextField('#apartment-number-field', {
+						label: 'Apartment number (optional)',
+						type: 'text',
+						placeholder: 'e.g., 5',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					countryField: mountTextField('#country-field', {
+						label: 'Country',
+						type: 'text',
+						placeholder: 'e.g., Poland',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					cityField: mountTextField('#city-field', {
+						label: 'City',
+						type: 'text',
+						placeholder: 'e.g., Warsaw',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					postalCodeField: mountTextField('#postal-code-field', {
+						label: 'Postal code',
+						type: 'text',
+						placeholder: 'e.g., 00-001',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					phoneField: mountTextField('#phone-field', {
+						label: 'Cellphone number',
+						type: 'text',
+						placeholder: 'e.g., +48 600 000 000',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					emailField: mountTextField('#email-field', {
+						label: 'Email address',
+						type: 'email',
+						placeholder: 'name@domain.com',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					cancelBtn: mountButton('#cancel-btn', {
+						label: 'Cancel',
+						variant: 'ghost',
+						size: 'sm',
+						onClick: () => {
+							window.location.href = '/report-problem.html';
+						}
+					}),
+				};
+
+
+				const submitBtn = mountButton('#submit-btn', {
+					label: 'Submit',
+					variant: 'primary',
+					size: 'md',
+					type: 'button',
+					onClick: () => {
+						submitOnboarding();
+					}
+				});
+
+				// Validation helpers
+				function clearAllErrors() {
+					[fields.firstNameField, fields.lastNameField, fields.streetField, 
+						fields.houseNumberField, fields.countryField, fields.cityField, 
+						fields.postalCodeField, fields.phoneField, 
+						fields.emailField].forEach(f => f.clearError());
+				}
+
+				async function submitOnboarding() {
+					clearAllErrors();
+
+					// Gather
+					const payload = {
+						person: {
+							name: fields.firstNameField.getValue().trim(),
+							secondName: fields.secondNameField.getValue().trim(),
+							surname: fields.lastNameField.getValue().trim(),
+						},
+						postalAddress: {
+							street: fields.streetField.getValue().trim(),
+							houseNumber: fields.houseNumberField.getValue().trim(),
+							apartmentNumber: fields.apartmentNumberField.getValue().trim(),
+							country: fields.countryField.getValue().trim(),
+							city: fields.cityField.getValue().trim(),
+							postalCode: fields.postalCodeField.getValue().trim(),
+							cellphone: fields.phoneField.getValue().trim(),
+							email: fields.emailField.getValue().trim(),
+						}
+					};
+
+					console.log(payload);
+				}
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
+
+		</script>
+	</body>
+</html>
