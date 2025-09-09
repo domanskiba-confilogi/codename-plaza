@@ -6,6 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<!-- Tailwind CSS (CDN) -->
 		<script src="https://cdn.tailwindcss.com"></script>
+		<link rel="stylesheet" href="/tailwind.js" />
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
 		<div id="error-modal-root"></div>
@@ -76,6 +77,32 @@
 					</section>
 				</form>
 
+				<form id="hardware-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-8">
+					<!-- Basic data -->
+					<section class="mb-8">
+						<h2 class="text-lg font-semibold mb-4">Requested hardware</h2>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+							<div id="hardware-laptop-checkbox-root"></div>
+							<div id="hardware-mouse-checkbox-root"></div>
+							<div id="hardware-headset-checkbox-root"></div>
+						</div>
+						<div class="flex items-center justify-between rounded-xl ring-1 ring-inset ring-neutral-800 bg-neutral-950/60 p-4">
+							<div class="flex-1">
+								<p class="text-sm font-medium">Special needs section</p>
+								<p class="text-xs text-neutral-500 mt-1 mb-4">Warning! All of the items inside this section are <span class="font-extrabold text-red-500/75">NOT ON-SITE</span> and can cause a time delay for your ticket.</p>
+
+								<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+									<div id="hardware-usb-c-network-card-checkbox-root"></div>
+									<div id="hardware-usb-a-wireless-network-card-checkbox-root"></div>
+									<div id="hardware-laptop-bag-checkbox-root"></div>
+								</div>
+							</div>
+							<!-- Toggle -->
+							<div id="worked-before-switch"></div>
+						</div>
+					</section>
+				</form>
+
 				<form id="permissions-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-8">
 					<!-- Basic data -->
 					<section class="mb-8">
@@ -87,9 +114,6 @@
 						</div>
 						<div id="subpermissions-wrapper" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 						</div>
-					</section>
-
-					<section class="mb-8">
 					</section>
 				</form>
 
@@ -149,9 +173,6 @@
 
 						return result.map(oneResult => oneResult.ok);
 					}).catch(reportCriticalError);
-
-				// TODO: Remove these console logs
-				console.log(jobTitles, companyDepartments, licenses, systemPermissions, mailingGroups, licenseToJobTitleMappings);
 
 				loadingScreen.destroy();
 
@@ -215,16 +236,16 @@
 					if (fields.jobTitleField.getChosen().length > 0) {
 						result = result.concat(
 							systemPermissionToJobTitleMappings
-							.filter(systemPermission => systemPermission.jobTitleId === fields.jobTitleField.getChosen()[0])
-							.map(systemPermission => systemPermission.systemPermissionId)
+								.filter(systemPermission => systemPermission.jobTitleId === fields.jobTitleField.getChosen()[0])
+								.map(systemPermission => systemPermission.systemPermissionId)
 						);
 					}
 
 					if (fields.jobSubtitleField.getChosen().length > 0) {
 						result = result.concat(
 							systemPermissionToJobTitleMappings
-							.filter(systemPermission => systemPermission.jobTitleId === fields.jobSubtitleField.getChosen()[0])
-							.map(systemPermission => systemPermission.systemPermissionId)
+								.filter(systemPermission => systemPermission.jobTitleId === fields.jobSubtitleField.getChosen()[0])
+								.map(systemPermission => systemPermission.systemPermissionId)
 						);
 					}
 
@@ -237,6 +258,71 @@
 						fields.masterSystemsField.enable();
 					}
 				}
+
+				function synchronizeJobTitleItems() {
+					fields.jobTitleField.enable();
+					fields.jobTitleField.setItems(jobTitles
+						.filter(jobTitle => jobTitle.company_department_id === fields.companyDepartmentField.getChosen()[0])
+						.map(jobTitle => ({
+							value: jobTitle.id,
+							displayText: jobTitle.name,
+						})));
+
+					fields.jobSubtitleField.disable();
+				}
+
+				function synchronizeJobSubtitleItems() {
+					fields.jobSubtitleField.setItems(jobTitles
+						.filter(jobTitle => jobTitle.parent_job_title_id === fields.jobTitleField.getChosen()[0])
+						.map(jobTitle => ({
+							value: jobTitle.id,
+							displayText: jobTitle.name,
+						})));
+
+					if (fields.jobSubtitleField.getItems().length > 0) {
+						fields.jobSubtitleField.enable();
+					}
+				}
+
+				function synchronizeSubpermissionCheckboxes() {
+					Object.values(fields.subpermissions).forEach(subpermissionField => subpermissionField.destroy());
+					fields.subpermissions = {};
+
+					document.querySelector("#subpermissions-wrapper").innerHTML = '';
+
+					const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
+
+					subpermissions.forEach(subpermission => {
+						const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
+
+						const singleCheckboxWrapper = document.createElement("div");
+						singleCheckboxWrapper.id = id;
+
+						document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
+
+						fields.subpermissions[subpermission.id] = mountCheckbox(
+							`#${id}`, 
+							{ 
+								label: subpermission.name, 
+								checked: !!requestedPermissionIds[subpermission.id],
+								trueLabel: null, 
+								falseLabel: null, 
+								onChange: ({ checked }) => {
+									requestedPermissionIds[subpermission.id] = checked;
+								}
+							}
+						);
+					});
+				}
+
+				const requestedPermissionIds = [];
+
+				const masterSystems = systemPermissions
+				.filter(systemPermission => systemPermission.subpermission_of_id === null)
+				.map(masterSystem => ({
+					value: masterSystem.id,
+					displayText: masterSystem.name,
+				}));
 
 				const fields = {
 					firstNameField: mountTextField('#first-name-field', {
@@ -272,15 +358,7 @@
 							clearErrorOnInput: true,
 							multiple: false,
 							onSelect: () => {
-								fields.jobTitleField.enable();
-								fields.jobTitleField.setItems(jobTitles
-									.filter(jobTitle => jobTitle.company_department_id === fields.companyDepartmentField.getChosen()[0])
-									.map(jobTitle => ({
-										value: jobTitle.id,
-										displayText: jobTitle.name,
-									})));
-
-								fields.jobSubtitleField.disable();
+								synchronizeJobTitleItems();
 							},
 						}),
 					jobTitleField: mountSelectField('#job-title-field', [], {
@@ -290,23 +368,12 @@
 						clearErrorOnInput: true,
 						multiple: false,
 						onSelect: () => {
-							fields.jobSubtitleField.setItems(jobTitles
-								.filter(jobTitle => jobTitle.parent_job_title_id === fields.jobTitleField.getChosen()[0])
-								.map(jobTitle => ({
-									value: jobTitle.id,
-									displayText: jobTitle.name,
-								})));
-
-							if (fields.jobSubtitleField.getItems().length > 0) {
-								fields.jobSubtitleField.enable();
-							}
-
+							synchronizeJobSubtitleItems();
 							setRequiredLicenses();
 							setRequiredSystemPermissions();
 						},
 						onRemove: () => {
-							fields.jobSubtitleField.setChosen([]);
-
+							synchronizeJobSubtitleItems();
 							setRequiredLicenses();
 							setRequiredSystemPermissions();
 						}
@@ -383,53 +450,35 @@
 						value: '',
 						clearErrorOnInput: true,
 					}),
-					masterSystemsField: mountSelectField("#master-systems-field", 
-						systemPermissions
-							.filter(systemPermission => systemPermission.subpermission_of_id === null)
-							.map(masterSystem => ({
-								value: masterSystem.id,
-								displayText: masterSystem.name,
-							})
-						), {
+					hardwareLaptopField: mountCheckbox("#hardware-laptop-checkbox-root", {
+						label: "Laptop"
+					}),
+					hardwareMouseField: mountCheckbox("#hardware-mouse-checkbox-root", {
+						label: "Mouse"
+					}),
+					hardwareHeadsetField: mountCheckbox("#hardware-headset-checkbox-root", {
+						label: "Headset"
+					}),
+					hardwareUsbCNetworkCardField: mountCheckbox("#hardware-usb-c-network-card-checkbox-root", {
+						label: "USB-C Network Card"
+					}),
+					hardwareUsbAWirelessNetworkCardField: mountCheckbox("#hardware-usb-a-wireless-network-card-checkbox-root", {
+						label: "USB-A Wireless Network Card"
+					}),
+					hardwareLaptopBagField: mountCheckbox("#hardware-laptop-bag-checkbox-root", {
+						label: "Laptop bag"
+					}),
+					masterSystemsField: mountSelectField(
+						"#master-systems-field", 
+						masterSystems, 
+						{
 							label: "Master systems",
 							placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
-							onSelect: () => {
-								fields.subpermissions.forEach(subpermissionField => subpermissionField.destroy());
-								fields.subpermissions = [];
-
-								document.querySelector("#subpermissions-wrapper").innerHTML = '';
-
-								const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
-
-								subpermissions.forEach(subpermission => {
-									const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
-
-									const singleCheckboxWrapper = document.createElement("div");
-									singleCheckboxWrapper.id = id;
-
-									document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
-									fields.subpermissions.push(mountCheckbox(`#${id}`, { label: subpermission.name, trueLabel: null, falseLabel: null }));
-								});
+							onSelect: ({ value, item, chosen }) => {
+								synchronizeSubpermissionCheckboxes();
 							},
 							onRemove: () => {
-								console.log(3);
-
-								fields.subpermissions.forEach(subpermissionField => subpermissionField.destroy());
-								fields.subpermissions = [];
-
-								document.querySelector("#subpermissions-wrapper").innerHTML = '';
-
-								const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
-
-								subpermissions.forEach(subpermission => {
-									const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
-
-									const singleCheckboxWrapper = document.createElement("div");
-									singleCheckboxWrapper.id = id;
-
-									document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
-									fields.subpermissions.push(mountCheckbox(`#${id}`, { label: subpermission.name, trueLabel: null, falseLabel: null }));
-								});
+								synchronizeSubpermissionCheckboxes();
 							}
 						}),
 					licensesField: mountSelectField("#licenses-field", licenses.map(license => ({
@@ -454,186 +503,81 @@
 							window.location.href = '/report-problem.html';
 						}
 					}),
-					subpermissions: []
+					subpermissions: {}
 				};
 
 
 				fields.jobTitleField.disable();
 				fields.jobSubtitleField.disable();
 
-				// Submit button: render as <button type="submit">
 				const submitBtn = mountButton('#submit-btn', {
-					label: 'Go to next step',
+					label: 'Submit',
 					variant: 'primary',
 					size: 'md',
-					type: 'submit', // applies when rendered as <button>
+					type: 'button',
+					onClick: () => {
+						submitOnboarding();
+					}
 				});
 
 				// Validation helpers
 				function clearAllErrors() {
-					[fields.firstNameField, fields.lastNameField, fields.streetField, fields.houseNumberField, 
-						fields.countryField, fields.cityField, fields.postalCodeField, fields.phoneField, 
+					[fields.firstNameField, fields.lastNameField, fields.streetField, 
+						fields.houseNumberField, fields.countryField, fields.cityField, 
+						fields.postalCodeField, fields.phoneField, 
 						fields.emailField].forEach(f => f.clearError());
 				}
 
-				async function submitOnboarding(e) {
-					e.preventDefault();
+				async function submitOnboarding() {
 					clearAllErrors();
 
 					// Gather
 					const payload = {
 						person: {
-							name: firstNameField.getValue().trim(),
-							secondName: secondNameField.getValue().trim(),
-							surname: lastNameField.getValue().trim(),
-							workedWithUsBefore: workedBeforeSwitch.getValue(),
+							name: fields.firstNameField.getValue().trim(),
+							secondName: fields.secondNameField.getValue().trim(),
+							surname: fields.lastNameField.getValue().trim(),
+							companyDepartment: fields.companyDepartmentField.getChosen().length > 0 ?
+								fields.companyDepartmentField.getChosen()[0] : null,
+							jobTitle: fields.jobTitleField.getChosen().length > 0 ?
+									fields.jobTitleField.getChosen()[0] : null,
+							jubSubtitle: fields.jobSubtitleField.getChosen().length > 0 ?
+									fields.jobSubtitleField.getChosen()[0] : null,
 						},
-						address: {
-							street: streetField.getValue().trim(),
-							houseNumber: houseNumberField.getValue().trim(),
-							apartmentNumber: apartmentNumberField.getValue().trim(),
-							country: countryField.getValue().trim(),
-							city: cityField.getValue().trim(),
-							postalCode: postalCodeField.getValue().trim(),
+						workedWithUsBefore: fields.workedBeforeSwitch.getValue(),
+						postalAddress: {
+							street: fields.streetField.getValue().trim(),
+							houseNumber: fields.houseNumberField.getValue().trim(),
+							apartmentNumber: fields.apartmentNumberField.getValue().trim(),
+							country: fields.countryField.getValue().trim(),
+							city: fields.cityField.getValue().trim(),
+							postalCode: fields.postalCodeField.getValue().trim(),
+							cellphone: fields.phoneField.getValue().trim(),
+							email: fields.emailField.getValue().trim(),
 						},
-						contact: {
-							cellphone: phoneField.getValue().trim(),
-							email: emailField.getValue().trim(),
-						}
+						hardware: [],
+						permissions: [],
+						licenses: fields.licensesField.getChosen(),
+						mailingGroups: fields.groupsField.getChosen(),
 					};
 
-					// Validate
-					let hasError = false;
-					if (isEmpty(payload.person.name)) { firstNameField.setError('Name is required'); hasError = true; }
-					if (isEmpty(payload.person.surname)) { lastNameField.setError('Surname is required'); hasError = true; }
+					if (fields.hardwareLaptopField.getValue()) payload.hardware.push('laptop');
+					if (fields.hardwareMouseField.getValue()) payload.hardware.push('mouse');
+					if (fields.hardwareHeadsetField.getValue()) payload.hardware.push('headset');
+					if (fields.hardwareUsbCNetworkCardField.getValue()) payload.hardware.push('usb-c-network-card');
+					if (fields.hardwareUsbAWirelessNetworkCardField.getValue()) payload.hardware.push('usb-a-wireless-network-card');
+					if (fields.hardwareLaptopBagField.getValue()) fields.hardware.push('laptop-bag');
 
-					if (isEmpty(payload.address.street)) { streetField.setError('Street is required'); hasError = true; }
-					if (isEmpty(payload.address.houseNumber)) { houseNumberField.setError('House number is required'); hasError = true; }
-					if (isEmpty(payload.address.country)) { countryField.setError('Country is required'); hasError = true; }
-					if (isEmpty(payload.address.city)) { cityField.setError('City is required'); hasError = true; }
-					if (isEmpty(payload.address.postalCode)) { postalCodeField.setError('Postal code is required'); hasError = true; }
-					else if (!validatePostal(payload.address.postalCode)) { postalCodeField.setError('Enter a valid postal code'); hasError = true; }
+					payload.permissions = fields.masterSystemsField.getChosen();
 
-					if (isEmpty(payload.contact.cellphone)) { phoneField.setError('Cellphone number is required'); hasError = true; }
-					else if (!validatePhone(payload.contact.cellphone)) { phoneField.setError('Enter a valid phone number'); hasError = true; }
-
-					if (isEmpty(payload.contact.email)) { emailField.setError('Email address is required'); hasError = true; }
-					else if (!validateEmail(payload.contact.email)) { emailField.setError('Enter a valid email'); hasError = true; }
-
-					if (hasError) return;
-
-					// Submit (placeholder): simulate request
-					const timer = typeof createAccessibilityTimer === 'function' ? createAccessibilityTimer(300) : { wait: () => Promise.resolve() };
-					submitBtn.setLoading(true);
-					[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-						apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-						.forEach(f => f.disable());
-					workedBeforeInput.disabled = true;
-
-					try {
-						let ok = true;
-						if (typeof createApiConnector === 'function') {
-							// If your API connector exposes an onboarding method, plug it here
-							const api = createApiConnector();
-							if (typeof api.reportOnboarding === 'function') {
-								const res = await api.reportOnboarding(payload);
-								ok = !!res?.ok;
-								if (!ok && res?.validationError) {
-									// Example: map server-side validation back to fields
-									const prop = String(res.validationError.property_name || '').toLowerCase();
-									const msg = res.validationError.message || 'Invalid value';
-									switch (prop) {
-										case 'name': firstNameField.setError(msg); break;
-										case 'surname': lastNameField.setError(msg); break;
-										case 'street': streetField.setError(msg); break;
-										case 'housenumber': houseNumberField.setError(msg); break;
-										case 'country': countryField.setError(msg); break;
-										case 'city': cityField.setError(msg); break;
-										case 'postalcode': postalCodeField.setError(msg); break;
-										case 'cellphone': phoneField.setError(msg); break;
-										case 'email': emailField.setError(msg); break;
-										default:
-											// Show general error modal
-											const modal = mountModal('#error-modal-root', {
-												title: 'Validation error',
-												contentHtml: `<p class="text-neutral-300">${escapeHtml(msg)}</p>`,
-												size: 'md',
-												primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
-												secondaryAction: null,
-												onClose: (api) => api.destroy(),
-											});
-											modal.open();
-									}
-								} else if (!ok && res?.unknownError) {
-									throw new Error(String(res.unknownError));
-								}
-							} else {
-								// No API method: simulate ok
-								await new Promise(r => setTimeout(r, 800));
-								ok = true;
-							}
-						} else {
-							// No connector in scope: simulate ok
-							await new Promise(r => setTimeout(r, 800));
-							ok = true;
+					Object.keys(fields.subpermissions).forEach(subpermissionId => {
+						if (fields.subpermissions[subpermissionId].getValue()) {
+							payload.permissions.push(parseInt(subpermissionId));
 						}
+					});
 
-						await timer.wait();
-						submitBtn.setLoading(false);
-						[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-							apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-							.forEach(f => f.enable());
-						workedBeforeInput.disabled = false;
-
-						if (ok) {
-							const summaryHtml = `
-<div class="space-y-2 text-sm">
-<p class="text-neutral-300">Onboarding has been submitted successfully.</p>
-<div class="text-neutral-400">
-<p><span class="text-neutral-300">Person:</span> ${escapeHtml(payload.person.name)} ${payload.person.secondName ? escapeHtml(payload.person.secondName) + ' ' : ''}${escapeHtml(payload.person.surname)}</p>
-<p><span class="text-neutral-300">Email:</span> ${escapeHtml(payload.contact.email)}</p>
-<p><span class="text-neutral-300">Worked with us before:</span> ${payload.person.workedWithUsBefore ? 'Yes' : 'No'}</p>
-</div>
-</div>
-`;
-							const successModal = mountModal('#error-modal-root', {
-								title: 'Onboarding submitted',
-								contentHtml: summaryHtml,
-								size: 'md',
-								primaryAction: { label: 'Close', onClick: (_, api) => api.close() },
-								secondaryAction: { label: 'Report another', onClick: (_, api) => { api.close(); document.getElementById('onboarding-form').reset(); } },
-								onClose: (api) => api.destroy(),
-							});
-							successModal.open();
-
-							// Optional: clear non-required fields only; here we leave values for convenience
-							// If you want full reset uncomment below:
-							// [firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-							//  apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-							//  .forEach(f => f.clear({ silent: true }));
-							// workedBeforeInput.checked = false; workedBeforeLabel.textContent = 'No';
-						}
-					} catch (err) {
-						await timer.wait();
-						submitBtn.setLoading(false);
-						[firstNameField, secondNameField, lastNameField, streetField, houseNumberField,
-							apartmentNumberField, countryField, cityField, postalCodeField, phoneField, emailField]
-							.forEach(f => f.enable());
-						workedBeforeInput.disabled = false;
-
-						const modalApi = mountModal('#error-modal-root', {
-							title: 'A critical error occured',
-							contentHtml: `<p class="text-neutral-300">${escapeHtml(err?.message || String(err))}</p>`,
-							size: 'md',
-							primaryAction: { label: 'OK', onClick: (_, api) => api.close() },
-							secondaryAction: null,
-							onClose: (api) => api.destroy(),
-						});
-						modalApi.open();
-					}
+					console.log(payload);
 				}
-
-				document.getElementById('address-form').addEventListener('submit', submitOnboarding);
 			} catch (error) {
 				reportCriticalError(error);
 			}

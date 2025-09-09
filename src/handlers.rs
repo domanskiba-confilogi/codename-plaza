@@ -229,3 +229,4 @@ pub async fn create_system_permission(
 
     Ok((StatusCode::OK, Json(system_permission)).into_response())
 }
+
