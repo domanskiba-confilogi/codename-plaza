@@ -37,10 +37,8 @@ function mountModal(selector, options = {}) {
 
 	// Render
 	root.innerHTML = `
-<div class="fixed inset-0 z-50 ${cfg.initialOpen ? '' : 'hidden'}" data-role="overlay" aria-hidden="${cfg.initialOpen ? 'false' : 'true'}">
-	<div class="absolute inset-0 bg-neutral-950/80 backdrop-blur"></div>
-
-	<div class="relative w-full p-4 flex items-center justify-center min-h-screen" data-role="backdrop">
+<div class="fixed inset-0 z-50 bg-neutral-950/80 ${cfg.initialOpen ? '' : 'hidden'} overflow-auto" data-role="overlay" aria-hidden="${cfg.initialOpen ? 'false' : 'true'}">
+	<div class="w-full p-4 flex items-center justify-center min-h-screen" data-role="backdrop">
 		<div
 			id="${dialogId}"
 			class="w-full ${sizeMap[cfg.size]} ${cfg.classes}"
