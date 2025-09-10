@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Confilogi IT Support - Report internet issue</title>
+		<title>Confilogi IT Support - Request account unlock</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="stylesheet" href="/tailwind.css">
 	</head>
@@ -20,8 +20,8 @@
 				<!-- Page header -->
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
 					<div>
-						<h1 class="text-xl sm:text-2xl font-semibold">Report slowness / stuttering issue</h1>
-						<p class="text-neutral-400 text-sm">Provide basic information about the person and their issue.</p>
+						<h1 class="text-xl sm:text-2xl font-semibold">Request account unlock</h1>
+						<p class="text-neutral-400 text-sm">Provide basic information about the person and their contact data.</p>
 					</div>
 					<div class="text-xs text-neutral-500">
 						All fields are required unless marked as optional
@@ -30,8 +30,7 @@
 
 				<!-- Form card -->
 				<form id="address-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-6">
-					<!-- Basic data -->
-					<section class="mb-8">
+					<section id="client-contact-form" class="mb-8">
 						<h2 class="text-lg font-semibold mb-4">Person who has the problem</h2>
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 							<div id="first-name-field"></div>
@@ -120,14 +119,14 @@
 					}),
 					anydeskField: mountTextField("#anydesk-field", {
 						type: 'text',
-						label: "Anydesk number",
+						label: "Anydesk number (optional)",
 						placeholder: "e.g., 1 234 567 890",
 						value: '',
 						clearErrorOnInput: true,
 					}),
 					computerIdField: mountTextField("#computer-id-field", {
 						type: 'text',
-						label: "Computer's id",
+						label: "Computer's id (optional)",
 						placeholder: "e.g., CONFI-123456789",
 						value: '',
 						clearErrorOnInput: true,
@@ -174,8 +173,8 @@
 							secondName: fields.secondNameField.getValue().trim(),
 							surname: fields.lastNameField.getValue().trim(),
 						},
-						anydeskNumber: fields.anydeskField.getValue().trim(),
-						computerId: fields.computerIdField.getValue().trim(),
+						anydeskNumber: fields.anydeskField.getValue().trim() || null,
+						computerId: fields.computerIdField.getValue().trim() || null,
 						description: fields.descriptionField.getValue().trim(),
 					};
 

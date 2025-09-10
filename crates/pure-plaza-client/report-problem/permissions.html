@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Confilogi IT Support - Request permissions</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/tailwind.css">
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
+		<div id="loading-screen"></div>
+
+		<!-- Navbar -->
+		<div data-loading="show" class="hidden" id="navbar-root"></div>
+
+		<!-- Main -->
+		<main data-loading="show" class="flex-1 hidden">
+			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+				<!-- Page header -->
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+					<div>
+						<h1 class="text-xl sm:text-2xl font-semibold">Request permissions</h1>
+						<p class="text-neutral-400 text-sm">Provide basic information about the person and their needs.</p>
+					</div>
+					<div class="text-xs text-neutral-500">
+						All fields are required unless marked as optional
+					</div>
+				</div>
+
+				<!-- Form card -->
+				<form id="address-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-6">
+					<!-- Basic data -->
+					<section class="mb-8">
+						<h2 class="text-lg font-semibold mb-4">Basic data</h2>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+							<div id="first-name-field"></div>
+							<div id="second-name-field"></div>
+							<div id="last-name-field"></div>
+						</div>
+					</section>
+				</form>
+
+				<form id="permissions-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-8">
+					<!-- Basic data -->
+					<section class="mb-8">
+						<h2 class="text-lg font-semibold mb-4">Requested permissions</h2>
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+							<div id="master-systems-field"></div>
+							<div id="licenses-field"></div>
+							<div id="groups-field"></div>
+						</div>
+						<div id="subpermissions-wrapper" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+						</div>
+					</section>
+				</form>
+
+				<!-- Actions -->
+				<div class="flex items-center justify-end gap-3">
+					<div id="cancel-btn"></div>
+					<div id="submit-btn"></div>
+				</div>
+			</section>
+		</main>
+
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/checkbox_field/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
+
+		<script>
+		const authStore = createAuthStore();
+
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
+
+		const apiConnector = createApiConnector();
+
+		(async () => {
+			try {
+				await checkIsLoggedInMiddleware(authStore);
+
+				const [
+					jobTitles,
+					companyDepartments,
+					licenses,
+					systemPermissions,
+					mailingGroups,
+					licenseToJobTitleMappings,
+					systemPermissionToJobTitleMappings
+				] = await Promise.all([
+						apiConnector.getJobTitles(),
+						apiConnector.getCompanyDepartments(),
+						apiConnector.getLicenses(),
+						apiConnector.getSystemPermissions(),
+						apiConnector.getMailingGroups(),
+						apiConnector.getLicenseToJobTitleMappings(),
+						apiConnector.getSystemPermissionToJobTitleMappings(),
+					]).then(result => {
+						for (oneResult of result) {
+							if (oneResult.unknownError !== null) {
+								// throws error
+								reportCriticalError(oneResult.unknownError);
+							}
+						}
+
+						return result.map(oneResult => oneResult.ok);
+					}).catch(reportCriticalError);
+
+				loadingScreen.destroy();
+
+				Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(element => {
+					element.classList.remove("hidden");
+				});
+
+				// Navbar
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
+
+				// Safe text helper for modal HTML content
+				function escapeHtml(str) {
+					return String(str).replace(/[&<>"']/g, s => ({
+						'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+					}[s]));
+				}
+
+				function synchronizeSubpermissionCheckboxes() {
+					Object.values(fields.subpermissions).forEach(subpermissionField => subpermissionField.destroy());
+					fields.subpermissions = {};
+
+					document.querySelector("#subpermissions-wrapper").innerHTML = '';
+
+					const subpermissions = systemPermissions.filter(systemPermission => fields.masterSystemsField.getChosen().includes(systemPermission.subpermission_of_id));
+
+					subpermissions.forEach(subpermission => {
+						const id = `subpermission-${escapeHtml(subpermission.id)}-root`;
+
+						const singleCheckboxWrapper = document.createElement("div");
+						singleCheckboxWrapper.id = id;
+
+						document.querySelector("#subpermissions-wrapper").appendChild(singleCheckboxWrapper);
+
+						fields.subpermissions[subpermission.id] = mountCheckbox(
+							`#${id}`, 
+							{ 
+								label: subpermission.name, 
+								checked: !!requestedPermissionIds[subpermission.id],
+								trueLabel: null, 
+								falseLabel: null, 
+								onChange: ({ checked }) => {
+									requestedPermissionIds[subpermission.id] = checked;
+								}
+							}
+						);
+					});
+				}
+
+				const requestedPermissionIds = [];
+
+				const masterSystems = systemPermissions
+					.filter(systemPermission => systemPermission.subpermission_of_id === null)
+					.map(masterSystem => ({
+						value: masterSystem.id,
+						displayText: masterSystem.name,
+					}));
+
+				const fields = {
+					firstNameField: mountTextField('#first-name-field', {
+						label: 'Name',
+						type: 'text',
+						placeholder: 'Enter name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					secondNameField: mountTextField('#second-name-field', {
+						label: 'Second name (optional)',
+						type: 'text',
+						placeholder: 'Enter second name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					lastNameField: mountTextField('#last-name-field', {
+						label: 'Surname',
+						type: 'text',
+						placeholder: 'Enter surname...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					masterSystemsField: mountSelectField(
+						"#master-systems-field", 
+						masterSystems, 
+						{
+							label: "Master systems",
+							placeholder: "Vici PL, Vici EU1, CRM EU, etc.",
+							onSelect: ({ value, item, chosen }) => {
+								synchronizeSubpermissionCheckboxes();
+							},
+							onRemove: () => {
+								synchronizeSubpermissionCheckboxes();
+							}
+						}),
+					licensesField: mountSelectField("#licenses-field", licenses.map(license => ({
+						value: license.id,
+						displayText: license.name,
+					})), {
+							label: "Licenses",
+							placeholder: "Office on desktop, PowerBI Pro, etc.",
+						}),
+					groupsField: mountSelectField("#groups-field", mailingGroups.map(mailingGroup => ({
+						value: mailingGroup.id,
+						displayText: `${mailingGroup.name} (${mailingGroup.email})`
+					})), {
+							label: "Groups",
+							placeholder: "e.g., CZ-SK Managers"
+						}),
+					cancelBtn: mountButton('#cancel-btn', {
+						label: 'Cancel',
+						variant: 'ghost',
+						size: 'sm',
+						onClick: () => {
+							window.location.href = '/report-problem.html';
+						}
+					}),
+					subpermissions: {}
+				};
+
+				const submitBtn = mountButton('#submit-btn', {
+					label: 'Submit',
+					variant: 'primary',
+					size: 'md',
+					type: 'button',
+					onClick: () => {
+						submitOnboarding();
+					}
+				});
+
+				// Validation helpers
+				function clearAllErrors() {
+					// TODO: finish this func
+				}
+
+				async function submitOnboarding() {
+					clearAllErrors();
+
+					// Gather
+					const payload = {
+						person: {
+							name: fields.firstNameField.getValue().trim(),
+							secondName: fields.secondNameField.getValue().trim(),
+							surname: fields.lastNameField.getValue().trim(),
+						},
+						permissions: [],
+						licenses: fields.licensesField.getChosen(),
+						mailingGroups: fields.groupsField.getChosen(),
+					};
+
+					payload.permissions = fields.masterSystemsField.getChosen();
+
+					Object.keys(fields.subpermissions).forEach(subpermissionId => {
+						if (fields.subpermissions[subpermissionId].getValue()) {
+							payload.permissions.push(parseInt(subpermissionId));
+						}
+					});
+
+					console.log(payload);
+				}
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
+
+		</script>
+	</body>
+</html>
