@@ -25,7 +25,7 @@ const LOGGED_IN_NAVBAR_ITEMS = [
 		label: 'Administration',
 		menuWidth: 'w-64',
 		items: [
-			{ label: 'User management', href: '#admin/users' },
+			{ label: 'User management', href: '/administration/user-management.html' },
 			{ label: 'Job title settings', href: '#admin/job-titles' },
 			{ label: 'Company department settings', href: '#admin/departments' },
 			{ label: 'User roles settings', href: '#admin/roles' },

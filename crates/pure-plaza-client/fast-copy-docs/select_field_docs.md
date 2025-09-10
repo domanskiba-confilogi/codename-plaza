@@ -1,276 +1,239 @@
-# SelectField (mountSelectField) — wielokrotny wybór z wyszukiwaniem (Vanilla JS)
+# SelectField — wielokrotny/jednokrotny wybór z wyszukiwaniem (Vanilla JS)
 
-Komponent pólka wielokrotnego wyboru z wyszukiwarką, działający bez frameworków. Renderuje input, listę wyników i „chipsy” wybranych pozycji. Stylowanie oparte jest na klasach Tailwind CSS (działa też bez Tailwinda, ale będzie mniej estetyczne).
+Lekki komponent oparty o czysty JavaScript, renderujący pole wyboru z:
+- filtrowaniem po tekście,
+- wyborem wielu pozycji (chipsy) lub trybem pojedynczym,
+- zdarzeniami CustomEvent i/lub callbackami,
+- pełnym API do sterowania w runtime.
 
-- Wybór wielu elementów
-- Filtrowanie po wpisywaniu
-- Obsługa klawiatury (Enter wybiera pierwszą pozycję)
-- Zdarzenia CustomEvent oraz callbacki
-- API do sterowania (disable/enable, clear, setItems, focus)
-- Tryb disabled
-- Łatwy mounting do dowolnego selektora
-
----
+Uwaga: komponent używa klas Tailwind CSS w markup (możesz je zastąpić własnymi). W kodzie pojawia się twardo zakodowany tekst “Brak wyników” oraz aria-label “Usuń …” w języku polskim.
 
 ## Szybki start
 
 HTML:
 ```html
-<div id="skills"></div>
+<div id="my-select"></div>
 ```
 
-JS:
+JavaScript:
 ```js
-// Upewnij się, że masz helper escapeHtml (patrz sekcja „Wymagania i uwagi”)
 const items = [
-  { value: 'js', displayText: 'JavaScript' },
-  { value: 'ts', displayText: 'TypeScript' },
-  { value: 'py', displayText: 'Python' },
+  { value: 1, displayText: 'Jabłko' },
+  { value: 2, displayText: 'Gruszka' },
+  { value: 3, displayText: 'Banany' },
 ];
 
-const select = mountSelectField('#skills', items, {
-  label: 'Wybierz technologie',
-  placeholder: 'Szukaj...',
-  onSelect: ({ value, item, chosen }) => console.log('Wybrane:', value, item, chosen),
-  onRemove: ({ value, item, chosen }) => console.log('Usunięte:', value, item, chosen),
+const select = mountSelectField('#my-select', items, {
+  label: 'Wybierz owoce',
+  placeholder: 'Szukaj…',
+  onSelect: ({ value, item, chosen }) => console.log('SELECT', value, item, chosen),
+  onRemove: ({ value, item, chosen }) => console.log('REMOVE', value, item, chosen),
 });
 
-// Odczyt aktualnego wyboru
-console.log(select.getChosen()); // np. []
+document.querySelector('#my-select')
+  .addEventListener('selectfield:change', (e) => {
+    console.log('CHANGE', e.detail.chosen);
+  });
 ```
 
----
+## Wymagania i założenia
 
-## Wymagania i uwagi
+- Środowisko: przeglądarka (DOM).
+- Selektor CSS musi wskazywać istniejący element. W przeciwnym razie zostanie rzucony błąd.
+- Parametr items musi być tablicą obiektów { value, displayText }, inaczej zostanie rzucony błąd.
+- Funkcja globalna escapeHtml musi być dostępna (jest używana do sanityzacji label i placeholder).
+- Komponent nadpisuje (innerHTML) zawartość wskazanego kontenera (root).
+- Stylowanie używa klas Tailwind. Jeśli nie używasz Tailwind, podmień klasy lub dodaj własny CSS.
+- Menu jest pozycjonowane absolutnie (z-index: 10) względem kontenera; upewnij się, że kontener nie ma overflow: hidden, które utnie listę.
 
-- Wymagany kontener w DOM: element dopasowany przez `document.querySelector(selector)`.
-- Funkcja `escapeHtml` musi być dostępna globalnie (używana do bezpiecznego wstrzykiwania label i placeholder). Przykład:
-  ```js
-  function escapeHtml(input) {
-    return String(input)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-  ```
-- Stylowanie używa klas Tailwind CSS. Bez Tailwinda komponent zadziała, ale będzie wyglądał surowo.
-- Wartości `item.value` powinny być porównywalne przez `===` (najlepiej prymitywy: string/number).
-- Wbudowane teksty interfejsu są po polsku („Brak wyników”, aria-label „Usuń ...”).
+## API montażu
 
----
-
-## API: sygnatura i parametry
-
-Sygnatura:
 ```js
-const instance = mountSelectField(selector, items, options?);
+const instance = mountSelectField(selector, items, options?)
 ```
 
-Parametry:
-- `selector` (string): selektor CSS kontenera, w którym komponent zostanie zamontowany. Przykład: `'#skills'`, `'.select-field'`.
-- `items` (Array<{ value: any, displayText: string }>): lista dostępnych opcji.
-  - `value`: identyfikator wartości (prymityw zalecany).
-  - `displayText`: tekst wyświetlany w menu i na chipie.
-- `options` (obiekt, opcjonalnie):
-  - `label` (string, domyślnie: "Select items"): etykieta pola.
-  - `placeholder` (string, domyślnie: "Search..."): placeholder inputu.
-  - `disabled` (boolean, domyślnie: false): startowy stan disabled.
-  - `onSelect` (fn): callback po wybraniu elementu.
-  - `onRemove` (fn): callback po usunięciu z wyboru.
+- selector: string — selektor CSS root-a (np. '#my-select').
+- items: Array<{ value: any, displayText: string }> — lista dostępnych opcji.
+- options?: 
+  - label?: string = 'Select items'
+  - placeholder?: string = 'Search...'
+  - disabled?: boolean = false
+  - multiple?: boolean = true  // inicjalny tryb wyboru
+  - onSelect?: (detail) => void
+  - onRemove?: (detail) => void
 
-Wyjątki:
-- Rzuca błąd, jeśli `selector` nie znajduje elementu.
-- Rzuca błąd, jeśli `items` nie jest tablicą.
+Uwaga: tekst “Brak wyników” (pusty stan) oraz aria-label na przycisku usuwania chipów są w kodzie na stałe po polsku.
 
----
+## Obiekt zwracany (metody publiczne)
+
+- getChosen(): any[] — zwraca kopię aktualnie wybranych wartości.
+- setChosen(newValues: any[]): void — programowo ustawia wybory:
+  - usuwa poprzednie (emituje 'remove' dla usuwanych),
+  - wybiera nowe (emituje 'select'),
+  - wymusza limit w trybie pojedynczym,
+  - emituje 'selectfield:change'.
+- setItems(nextItems: { value, displayText }[]): void — podmienia listę opcji:
+  - czyści wybór (emituje 'remove' dla usuniętych),
+  - ustawia nowe items,
+  - wymusza limit w trybie pojedynczym,
+  - emituje 'selectfield:change'.
+- getItems(): { value, displayText }[] — kopia aktualnej listy opcji.
+- clear(): void — usuwa wszystkie wybory, czyści wyszukiwarkę; emituje 'remove' dla każdego usuniętego.
+- clearSearch(): void — czyści wyłącznie tekst wyszukiwania.
+- focus(): void — focus na input (jeśli nie disabled).
+- disable(): void — ustawia disabled = true (ukrywa menu, blokuje interakcje).
+- enable(): void — ustawia disabled = false.
+- setDisabled(flag: boolean): void — bezpośrednie ustawienie disabled.
+- isDisabled(): boolean — aktualny stan disabled.
+- addEventListener(eventName, handler): () => void — sugar dla addEventListener na root:
+  - automatycznie prefiksuje eventy 'selectfield:' jeśli brak,
+  - zwraca funkcję wypisania (unsubscribe).
+- removeEventListener(eventName, handler): void — sugar dla removeEventListener.
+- setOnSelect(fn | null): void — runtime’owa podmiana callbacku onSelect.
+- setOnRemove(fn | null): void — runtime’owa podmiana callbacku onRemove.
+- setMultiple(flag: boolean): void — przełącza tryb pojedynczy/wielokrotny:
+  - wchodząc w single, przycina wybór do jednego i emituje 'remove' dla odrzuconych.
+- isMultiple(): boolean — aktualny tryb.
+- destroy(): void — usuwa nasłuchy i czyści root.innerHTML.
 
 ## Zdarzenia
 
-Komponent emituje CustomEvent na elemencie root (kontenerze `selector`):
+Komponent emituje CustomEvent-y na elemencie root.
 
-- `selectfield:select` — po dodaniu elementu
-  - `event.detail`:
-    - `value`: wybrana wartość
-    - `item`: pełny obiekt `{ value, displayText }` (lub fallback)
-    - `chosen`: bieżąca kopia tablicy wybranych wartości
-- `selectfield:remove` — po usunięciu elementu
-  - `event.detail`: jak wyżej
-- `selectfield:change` — po każdej zmianie selekcji
-  - `event.detail`:
-    - `chosen`: kopia tablicy wybranych wartości
+- selectfield:select
+  - detail: { value, item, chosen }
+  - value: wybrane value
+  - item: dopasowany obiekt z items (lub fallback { value, displayText: String(value) })
+  - chosen: kopia aktualnie wybranych wartości po zdarzeniu
+- selectfield:remove
+  - detail: { value, item, chosen } — analogicznie
+- selectfield:change
+  - detail: { chosen } — emituje się po każdej zmianie zbioru wybranych
 
-Uwaga: `onSelect` i `onRemove` z `options` wywoływane są dodatkowo (są niezależne od CustomEvent).
+Dodatkowo, jeśli przekazano options.onSelect / options.onRemove lub ustawiono setOnSelect / setOnRemove, te callbacki też zostaną wywołane przy odpowiednich zdarzeniach.
 
-Syntactic sugar:
-- Metody `instance.addEventListener(eventName, handler)` i `instance.removeEventListener` akceptują nazwę z lub bez prefiksu `selectfield:` (np. `'select'` albo `'selectfield:select'`).
-
-Przykład:
-```js
-const unsubscribe = select.addEventListener('change', (e) => {
-  console.log('Aktualny wybór:', e.detail.chosen);
-});
-// unsubscribe(); // aby odpiąć
-```
-
----
-
-## Publiczne metody instancji
-
-- `getChosen(): any[]` — zwraca kopię wybranych wartości.
-- `setItems(nextItems: {value, displayText}[])` — ustawia nową listę opcji.
-  - Uwaga: aktualna implementacja nadpisuje selekcję tak, że wybiera wszystkie nowe wartości (patrz „Znane ograniczenia”).
-  - Emisja: `selectfield:change`.
-- `clear()` — usuwa wszystkie wybrane wartości.
-  - Emisja: dla każdego usuniętego elementu: `remove` + `change`.
-- `clearSearch()` — czyści wpisany tekst i filtr.
-- `focus()` — ustawia focus na input (jeśli nie jest disabled).
-- `disable()` — przełącza komponent w stan disabled (blokada UI i interakcji).
-- `enable()` — odblokowuje komponent.
-- `setDisabled(flag: boolean)` — jawne ustawienie stanu disabled.
-- `isDisabled(): boolean` — sprawdza stan disabled.
-- `addEventListener(eventName, handler): () => void` — dodaje nasłuch na CustomEvent (zwraca funkcję do wypięcia).
-- `removeEventListener(eventName, handler)` — usuwa nasłuch dodany bezpośrednio.
-- `setOnSelect(fn)` — runtime’owa podmiana callbacku `onSelect`.
-- `setOnRemove(fn)` — runtime’owa podmiana callbacku `onRemove`.
-- `destroy()` — odmontowuje komponent (usuwa nasłuchy i czyści `root.innerHTML`).
-
----
+Sugar addEventListener normalizuje nazwy: addEventListener('select', fn) jest równoznaczne z addEventListener('selectfield:select', fn).
 
 ## Zachowanie i UX
 
-- Filtrowanie:
-  - Case-insensitive, `displayText` zawiera wpisany fragment.
-  - Po wybraniu elementu input i filtr są czyszczone.
-- Menu:
-  - Pokazuje się przy kliknięciu/focusie w input.
-  - Ukrywa się z opóźnieniem 150 ms po blur (aby umożliwić kliknięcie w opcję).
-  - W treści „Brak wyników” gdy nic nie pasuje.
-- Klawiatura:
-  - Enter wybiera pierwszą pasującą pozycję (jeśli jest).
-- Chipsy:
-  - Pokazują wybrane elementy; przycisk X usuwa dany element.
-  - W stanie disabled przyciski są nieaktywne.
-- Disabled:
-  - Input zablokowany, menu ukryte, brak reakcji na interakcje.
-- i18n:
-  - Teksty „Brak wyników”, aria-label „Usuń {nazwa}” są po polsku (na stałe w kodzie).
+- Filtrowanie: case-insensitive, po displayText, z pominięciem już wybranych.
+- Enter w polu input: wybiera pierwszą pasującą pozycję.
+- Klik w input/focus: otwiera menu.
+- Blur: menu chowa się po 150 ms (aby klik w opcję zdążył się zarejestrować).
+- Tryb pojedynczy:
+  - wybór zastępuje poprzedni, menu zamyka się i nie otwiera automatycznie,
+  - mechanizm enforceSelectionLimit dba o to, by pozostał tylko jeden wybór.
+- Tryb wielokrotny:
+  - po wyborze menu otwiera się ponownie z krótkim opóźnieniem (50 ms), a fokus wraca do inputa.
+- Dostępność:
+  - label połączony z input (for/id),
+  - przyciski usuwania chipów mają aria-label,
+  - lista opcji to przyciski w div-ie (bez roli listbox) — rozbudowa ARIA jest możliwa w Twojej implementacji.
 
----
+## Przykłady
 
-## Przykłady użycia
-
-Podstawowy:
+1) Podstawowy multi-select
 ```js
-const s = mountSelectField('#tags', [
-  { value: 1, displayText: 'Frontend' },
-  { value: 2, displayText: 'Backend' },
-  { value: 3, displayText: 'DevOps' },
-], { label: 'Tagi', placeholder: 'Szukaj tagów...' });
+const fruits = [
+  { value: 'apple', displayText: 'Jabłko' },
+  { value: 'pear', displayText: 'Gruszka' },
+  { value: 'banana', displayText: 'Banany' },
+];
+
+const api = mountSelectField('#fruits', fruits, {
+  label: 'Owoce',
+  placeholder: 'Szukaj owocu…',
+});
+
+api.addEventListener('change', (e) => {
+  console.log('Wybrane:', e.detail.chosen);
+});
 ```
 
-Obsługa zdarzeń:
+2) Tryb pojedynczy (single)
 ```js
-s.addEventListener('select', (e) => console.log('Dodano:', e.detail.item.displayText));
-s.addEventListener('remove', (e) => console.log('Usunięto:', e.detail.item.displayText));
-s.addEventListener('change', (e) => console.log('Wybrane:', e.detail.chosen));
+const api = mountSelectField('#single', fruits, {
+  label: 'Ulubiony owoc',
+  placeholder: 'Wpisz…',
+  multiple: false,
+});
+api.setChosen(['pear']); // ustawia wybór programowo (w single i tak zostanie jeden)
 ```
 
-Aktualizacja listy elementów:
+3) Dynamiczna podmiana listy
 ```js
-s.setItems([
-  { value: 'a', displayText: 'Alpha' },
-  { value: 'b', displayText: 'Beta' },
+api.setItems([
+  { value: 'cherry', displayText: 'Wiśnia' },
+  { value: 'plum', displayText: 'Śliwka' },
 ]);
-// Uwaga: po setItems wybór = wszystkie nowe wartości ('a','b') zgodnie z aktualną implementacją.
+// Zdarzenie 'change' zostanie wyemitowane, a poprzednie wybory usunięte.
 ```
 
-Blokada/odblokowanie:
+4) Wyłączenie/aktywacja
 ```js
-s.disable();
-// ...
-s.enable();
+api.disable();
+// … później
+api.enable();
 ```
 
-Czyszczenie:
+5) Praca z formularzem (hidden input)
 ```js
-s.clear();      // usuwa wszystkie wybrane wartości
-s.clearSearch(); // czyści tylko filtr w input
+const hidden = document.querySelector('#fruits-hidden');
+api.addEventListener('change', (e) => {
+  hidden.value = JSON.stringify(e.detail.chosen);
+});
 ```
 
-Sprzątanie:
+6) Odsubskrybowanie listenera
 ```js
-s.destroy();
+const off = api.addEventListener('select', (e) => console.log('Wybrano', e.detail.value));
+// …
+off(); // usuwa nasłuch
 ```
 
----
+## Modyfikacja tekstów (i18n)
 
-## Wskazówki dot. stylów
+- Label i placeholder można ustawić przez options.
+- Tekst pustej listy “Brak wyników” oraz aria-label “Usuń …” są twardo zakodowane w kodzie:
+  - renderMenu() tworzy element z tekstem 'Brak wyników'.
+  - Przyciski usuwania chipów mają aria-label “Usuń ${displayText}”.
+- Jeśli potrzebujesz pełnej internacjonalizacji, rozważ:
+  - dodanie nowych opcji (np. emptyText, removeAriaLabelFormatter),
+  - lub modyfikację źródeł komponentu.
 
-- Kontener zawiera wewnątrz wrapper z klasą `relative`, a menu ma `absolute top-[110%] left-0`. Zapewnij, że rodzic nie ma `overflow: hidden`, które ucina dropdown.
-- Klasy Tailwind można dostosować modyfikując kod, jeśli potrzebujesz innego wyglądu.
-- Ikona „X” to wbudowane SVG; można podmienić w kodzie `X_ICON_SVG`.
+## Stylowanie
 
----
+- Kluczowe hooki w DOM:
+  - root (kontener), w nim:
+    - label
+    - .chips — kontener na chipy (ukrywany/ujawniany przez klasę 'hidden')
+    - input — pole wyszukiwania
+    - .menu — lista opcji (absolute, z-index 10, ukrywana klasą 'hidden')
+- Domyślne klasy Tailwind opisują tło, obramowanie, stany focus/hover.
+- Możesz:
+  - podmienić klasy w kodzie, lub
+  - nadpisać je CSS-em, lub
+  - zintegrować z własną skalą kolorów/tematem.
 
-## Znane ograniczenia i pułapki
+## Błędy i diagnostyka
 
-- setItems nadpisuje wybór: obecna logika ustawia `chosen` na „wszystkie dostępne wartości” po wywołaniu. To jest zachowane zgodnie z pierwowzorem i może zaskoczyć — jeżeli chcesz innego zachowania, owiń `setItems` własną logiką (np. zachowaj wspólną część dotychczasowego wyboru).
-- Brak konfiguracji limitu liczby wyborów (wszystkie dozwolone).
-- Twardo zakodowane polskie teksty („Brak wyników” i aria-label).
-- Wymagany globalny `escapeHtml`. Brak definiowania tej funkcji spowoduje błąd w momencie montowania.
-- `value` powinien być prymitywem; obiekty jako `value` mogą nie działać z `includes/indexOf` zgodnie z oczekiwaniami.
+- mountSelectField: no element found for selector "…"
+  - selector wskazuje nieistniejący element.
+- "items" must be an array of { value, displayText }
+  - przekazano niewłaściwy typ dla items.
+- ReferenceError: escapeHtml is not defined
+  - upewnij się, że globalna funkcja escapeHtml istnieje (patrz Szybki start).
+- W trakcie wyboru w konsoli pojawiają się logi console.info (Chosen item with value: …) — usuń je w kodzie, jeśli nie chcesz logów.
 
----
+## Wewnętrzne szczegóły działania (dla integratorów)
 
-## Typy (przykładowe, TypeScript)
+- Obsługa klawiatury:
+  - Enter wybiera pierwszy dopasowany element.
+  - Nie ma nawigacji strzałkami po liście (można rozbudować).
 
-```ts
-type SelectItem<Value = string> = {
-  value: Value;
-  displayText: string;
-};
+## Sprzątanie
 
-type SelectDetail<Value = string> = {
-  value: Value;
-  item: SelectItem<Value>;
-  chosen: Value[];
-};
-
-type MountOptions<Value = string> = {
-  label?: string;
-  placeholder?: string;
-  disabled?: boolean;
-  onSelect?: (detail: SelectDetail<Value>) => void;
-  onRemove?: (detail: SelectDetail<Value>) => void;
-};
-
-type SelectInstance<Value = string> = {
-  getChosen: () => Value[];
-  setItems: (items: SelectItem<Value>[]) => void;
-  clear: () => void;
-  clearSearch: () => void;
-  focus: () => void;
-  disable: () => void;
-  enable: () => void;
-  setDisabled: (flag: boolean) => void;
-  isDisabled: () => boolean;
-  addEventListener: (eventName: string, handler: (e: CustomEvent<any>) => void) => () => void;
-  removeEventListener: (eventName: string, handler: (e: CustomEvent<any>) => void) => void;
-  setOnSelect: (fn?: (detail: SelectDetail<Value>) => void) => void;
-  setOnRemove: (fn?: (detail: SelectDetail<Value>) => void) => void;
-  destroy: () => void;
-};
-```
-
----
-
-## Sprzątanie (destroy)
-
-Jeśli komponent jest montowany dynamicznie (np. w SPA) — przed usunięciem kontenera wywołaj `destroy()`:
-```js
-const inst = mountSelectField('#container', items);
-// ...
-inst.destroy(); // usuwa nasłuchy i czyści zawartość root.innerHTML
-```
+- Wywołaj instance.destroy(), aby:
+  - odpiąć wszystkie nasłuchy z inputa,
+  - opróżnić root.innerHTML.
+- Po destroy nie używaj metod instancji.

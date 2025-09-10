@@ -186,17 +186,6 @@
 			{ value: 'Canceled', displayText: 'Canceled' },
 		];
 
-		// Multi-selects
-		const categorySelect = mountSelectField('#category-filter', CATEGORY_ITEMS, {
-			label: 'Categories',
-			placeholder: 'Filter categories...'
-		});
-		const statusSelect = mountSelectField('#status-filter', STATUS_ITEMS, {
-			label: 'Statuses',
-			placeholder: 'Filter statuses...'
-		});
-
-		// Because SelectField has no external change callback, listen to interactions on its root
 		const scheduleFromSelects = () => {
 			// Delay to let the component update internal state first
 			setTimeout(() => {
@@ -205,9 +194,17 @@
 				render();
 			}, 0);
 		};
-		['click', 'keyup', 'input'].forEach(evt => {
-			categorySelect.root.addEventListener(evt, scheduleFromSelects);
-			statusSelect.root.addEventListener(evt, scheduleFromSelects);
+
+		// Multi-selects
+		const categorySelect = mountSelectField('#category-filter', CATEGORY_ITEMS, {
+			label: 'Categories',
+			placeholder: 'Filter categories...',
+			onSelect: scheduleFromSelects,
+		});
+		const statusSelect = mountSelectField('#status-filter', STATUS_ITEMS, {
+			label: 'Statuses',
+			placeholder: 'Filter statuses...',
+			onSelect: scheduleFromSelects,
 		});
 
 		// Sorting
