@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Confilogi IT Support - Report problem</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="/tailwind.css">
+	</head>
+	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
+		<div id="loading-screen"></div>
+
+		<!-- Navbar -->
+		<div data-loading="show" class="hidden" id="navbar-root"></div>
+
+		<!-- Main -->
+		<main data-loading="show" class="flex-1 hidden">
+			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+				<!-- Page header -->
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+					<div>
+						<h1 class="text-xl sm:text-2xl font-semibold">Report problem</h1>
+						<p class="text-neutral-400 text-sm">Provide basic information about the problem and your contact data if needed.</p>
+					</div>
+					<div class="text-xs text-neutral-500">
+						All fields are required unless marked as optional
+					</div>
+				</div>
+
+				<!-- Form card -->
+				<form id="address-form" class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 sm:p-8 shadow-lg mb-6">
+					<!-- Postal Address -->
+					<section>
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<h2 class="text-lg font-semibold mb-4">Problem details</h2>
+							<div class="min-h-[150px] sm:col-span-2" id="description-field"></div>
+						</div>
+					</section>
+				</form>
+
+				<!-- Actions -->
+				<div class="flex items-center justify-end gap-3">
+					<div id="cancel-btn"></div>
+					<div id="submit-btn"></div>
+				</div>
+			</section>
+		</main>
+
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/checkbox_field/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
+		<script src="/components/textarea_field/main.js"></script>
+
+		<script>
+		const authStore = createAuthStore();
+
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
+
+		const apiConnector = createApiConnector();
+
+		(async () => {
+			try {
+				await checkIsLoggedInMiddleware(authStore);
+
+				loadingScreen.destroy();
+
+				Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(element => {
+					element.classList.remove("hidden");
+				});
+
+				// Navbar
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
+
+				const fields = {
+					descriptionField: mountTextArea("#description-field", {
+						label: "Description of the problem",
+						placeholder: "Tell us about your problem...",
+						value: '',
+						clearErrorOnInput: true,
+					}),
+				};
+
+				const cancelBtn = mountButton('#cancel-btn', {
+					label: 'Cancel',
+					variant: 'ghost',
+					size: 'sm',
+					onClick: () => {
+						window.location.href = '/report-problem.html';
+					}
+				});
+
+				const submitBtn = mountButton('#submit-btn', {
+					label: 'Submit',
+					variant: 'primary',
+					size: 'md',
+					type: 'button',
+					onClick: () => {
+						submit();
+					}
+				});
+
+				// Validation helpers
+				function clearAllErrors() {
+					Object.values(fields).forEach(f => f.clearError());
+				}
+
+				async function submit() {
+					clearAllErrors();
+
+					// Gather
+					const payload = {
+						description: fields.descriptionField.getValue().trim(),
+					};
+
+					console.log(payload);
+				}
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
+
+		</script>
+	</body>
+</html>
+
