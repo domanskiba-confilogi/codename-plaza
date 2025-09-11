@@ -5,11 +5,16 @@ use clap::Parser;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
+use crate::intranet::IntranetApi;
+use tokio::time::Duration;
+use tokio_util::sync::CancellationToken;
+use std::collections::HashSet;
 
 mod middlewares;
 mod uow;
 mod handlers;
 mod validation;
+mod intranet;
 
 #[cfg(debug_assertions)]
 const IS_BUILD_DEBUG: bool = true;
@@ -32,6 +37,9 @@ struct Args {
 
     #[arg(long)]
     db_database: String,
+
+    #[arg(long)]
+    intranet_api_key: String,
 }
 
 async fn seed(db_pool: &Pool<Postgres>) {
@@ -149,7 +157,39 @@ async fn main() {
         .nest("/licenses", licenses_router)
         .with_state(db_pool);
 
+    let intranet_api = IntranetApi::new(args.intranet_api_key);
+
+    tokio::spawn(job_title_synchronization_background_worker(intranet_api, CancellationToken::new()));
+
     let tcp_listener = TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
     axum::serve(tcp_listener, router).await.unwrap();
+}
+
+async fn job_title_synchronization_background_worker(intranet_api: IntranetApi, cancellation_token: CancellationToken) {
+    loop {
+        match intranet_api.download_users().await {
+            Ok(users) => {
+                let mut job_titles = users.into_iter()
+                    .filter(|user| user.is_enabled)
+                    .map(|user| user.job_title.trim().to_string())
+                    .filter(|job_title| job_title.len() > 1)
+                    .collect::<HashSet<String>>()
+                    .into_iter()
+                    .collect::<Vec<String>>();
+
+                job_titles.sort();
+
+                eprintln!("Fetched data from intranet successfully. Job titles ({}): {}", job_titles.len(), job_titles.join("\r\n - "));
+            },
+            Err(error) => {
+                eprintln!("Intranet job titles synchronization error! Error: {error:?}");
+            }
+        };
+
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(60)) => {},
+            _ = cancellation_token.cancelled() => break,
+        };
+    }
 }

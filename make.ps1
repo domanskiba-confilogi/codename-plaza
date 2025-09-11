@@ -10,8 +10,10 @@ $BackEndPath = $PSScriptRoot;
 $env:DATABASE_URL = 'postgresql://postgres:Confilogi89@127.0.0.1:5432/plaza';
 
 if ($Command -eq "watch-backend") {
+	$CommandArgs = "run --quiet -- --db-host 127.0.0.1 --db-port 5432 --db-username postgres --db-password Confilogi89 --db-database plaza --intranet-api-key " + $env:INTRANET_API_KEY;
+
 	Set-Location $BackEndPath;
-	cargo watch -x "run -- --db-host 127.0.0.1 --db-port 5432 --db-username postgres --db-password Confilogi89 --db-database plaza";
+	cargo watch --quiet -x $CommandArgs;
 } elseif ($Command -eq "watch-frontend-css") {
 	Set-Location $FrontEndPath;
 	npx @tailwindcss/cli -i .\tailwind-input.css -o .\tailwind.css --watch
