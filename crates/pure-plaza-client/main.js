@@ -26,10 +26,9 @@ const LOGGED_IN_NAVBAR_ITEMS = [
 		menuWidth: 'w-64',
 		items: [
 			{ label: 'User management', href: '/administration/user-management.html' },
-			{ label: 'Job title settings', href: '#admin/job-titles' },
-			{ label: 'Company department settings', href: '#admin/departments' },
-			{ label: 'User roles settings', href: '#admin/roles' },
-			{ label: 'Other settings', href: '#admin/other-settings' },
+			{ label: 'Job title settings', href: '/administration/job-titles.html' },
+			{ label: 'Company department settings', href: '/administration/company-departments.html' },
+			{ label: 'Other settings', href: '/administration/other-settings.html' },
 		]
 	},
 	{ type: 'link', label: 'Sign out', href: '/sign-out.html' }

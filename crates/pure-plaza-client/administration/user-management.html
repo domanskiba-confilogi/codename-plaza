@@ -75,8 +75,11 @@
 					<p class="text-xs text-neutral-500">Live updates as you filter or edit users</p>
 				</div>
 
-				<!-- Users table -->
-				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl overflow-hidden">
+				<!-- Mobile list (cards) -->
+				<div id="users-cards-root" class="grid grid-cols-1 gap-3 md:hidden"></div>
+
+				<!-- Desktop table (md+) -->
+				<div id="users-table-wrapper" class="hidden md:block bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl overflow-hidden">
 					<div class="overflow-x-auto">
 						<table class="min-w-full divide-y divide-neutral-800">
 							<thead class="bg-neutral-900/60">
@@ -85,7 +88,8 @@
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Email</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Role</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Status</th>
-									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Last login</th>
+									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Created</th>
+									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Last login</th>
 									<th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">Actions</th>
 								</tr>
 							</thead>
@@ -248,6 +252,12 @@
 		const tbody = document.getElementById('users-tbody');
 		const summaryEl = document.getElementById('results-summary');
 		const emptyStateEl = document.getElementById('empty-state');
+		const cardsRoot = document.getElementById('users-cards-root');
+
+		function mountIfExists(selector, options) {
+			const el = document.querySelector(selector);
+			return el ? mountButton(selector, options) : null;
+		}
 
 		let rowButtons = []; // cleanup registry for per-row button instances
 
@@ -324,18 +334,19 @@
 
 			if (filtered.length === 0) {
 				tbody.innerHTML = '';
+				cardsRoot.innerHTML = '';
 				emptyStateEl.classList.remove('hidden');
 				return;
 			}
 			emptyStateEl.classList.add('hidden');
 
+			// Desktop table rows (md+)
 			const rowsHtml = filtered.map(u => {
 				const created = new Date(u.createdAt);
 				const last = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—';
 				const editId = `edit-${u.id}`;
 				const toggleId = `toggle-${u.id}`;
 				const delId = `del-${u.id}`;
-
 				return `
 <tr class="hover:bg-neutral-900/40 transition">
 <td class="px-4 py-3 align-top">
@@ -353,7 +364,10 @@
 <td class="px-4 py-3 align-top">
 <span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.status)}">${escapeHtml(u.status)}</span>
 </td>
-<td class="px-4 py-3 align-top text-neutral-300">
+<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300 hidden lg:block">
+${created.toLocaleString()}
+</td>
+<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300 hidden lg:block">
 ${escapeHtml(last)}
 </td>
 <td class="px-4 py-3 align-top">
@@ -368,27 +382,81 @@ ${escapeHtml(last)}
 			}).join('');
 			tbody.innerHTML = rowsHtml;
 
-			// Mount per-row action buttons [4]
+			// Mobile cards (sm/md)
+			const cardsHtml = filtered.map(u => {
+				const created = new Date(u.createdAt).toLocaleString();
+				const last = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—';
+				const editIdM = `edit-m-${u.id}`;
+				const toggleIdM = `toggle-m-${u.id}`;
+				const delIdM = `del-m-${u.id}`;
+
+				// Intentionally concise on mobile: key fields + compact meta
+				return `
+<article class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 flex flex-col gap-3 hover:bg-neutral-900 transition">
+<div class="flex items-start justify-between gap-3">
+<div>
+<h2 class="text-base font-semibold leading-snug">${escapeHtml(u.name)}</h2>
+<p class="text-sm text-neutral-400">${escapeHtml(u.email)}</p>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.status)}">
+${escapeHtml(u.status)}
+</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">
+${escapeHtml(u.role)}
+</span>
+<span class="text-xs text-neutral-500">ID: ${escapeHtml(u.id)}</span>
+</div>
+<div class="text-xs text-neutral-500 flex flex-wrap gap-x-4 gap-y-1">
+<span>Created: ${escapeHtml(created)}</span>
+<span>Last login: ${escapeHtml(last)}</span>
+</div>
+<div class="mt-1 flex items-center justify-end gap-2">
+<span id="${editIdM}"></span>
+<span id="${toggleIdM}"></span>
+<span id="${delIdM}"></span>
+</div>
+</article>
+`;
+			}).join('');
+			cardsRoot.innerHTML = cardsHtml;
+
+			// Mount action buttons for both views
 			for (const u of filtered) {
-				const editBtn = mountButton(`#edit-${u.id}`, {
-					label: 'Edit',
-					variant: 'ghost',
-					size: 'sm',
+				// Desktop table
+				const editBtn = mountIfExists(`#edit-${u.id}`, {
+					label: 'Edit', variant: 'ghost', size: 'sm',
 					onClick: () => openEditUserModal(u.id),
 				});
-				const toggleBtn = mountButton(`#toggle-${u.id}`, {
+				const toggleBtn = mountIfExists(`#toggle-${u.id}`, {
 					label: u.status === 'Active' ? 'Disable' : 'Enable',
-					variant: u.status === 'Active' ? 'warning' : 'success',
-					size: 'sm',
+					variant: u.status === 'Active' ? 'warning' : 'success', size: 'sm',
 					onClick: () => toggleUserStatus(u.id),
 				});
-				const delBtn = mountButton(`#del-${u.id}`, {
-					label: 'Delete',
-					variant: 'danger',
-					size: 'sm',
+				const delBtn = mountIfExists(`#del-${u.id}`, {
+					label: 'Delete', variant: 'danger', size: 'sm',
 					onClick: () => confirmDeleteUser(u.id),
 				});
-				rowButtons.push(editBtn, toggleBtn, delBtn);
+
+				// Mobile cards
+				const editBtnM = mountIfExists(`#edit-m-${u.id}`, {
+					label: 'Edit', variant: 'ghost', size: 'sm',
+					onClick: () => openEditUserModal(u.id),
+				});
+				const toggleBtnM = mountIfExists(`#toggle-m-${u.id}`, {
+					label: u.status === 'Active' ? 'Disable' : 'Enable',
+					variant: u.status === 'Active' ? 'warning' : 'success', size: 'sm',
+					onClick: () => toggleUserStatus(u.id),
+				});
+				const delBtnM = mountIfExists(`#del-m-${u.id}`, {
+					label: 'Delete', variant: 'danger', size: 'sm',
+					onClick: () => confirmDeleteUser(u.id),
+				});
+
+				for (const b of [editBtn, toggleBtn, delBtn, editBtnM, toggleBtnM, delBtnM]) {
+					if (b) rowButtons.push(b);
+				}
 			}
 		}
 
