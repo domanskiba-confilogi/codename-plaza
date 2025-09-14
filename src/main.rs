@@ -9,17 +9,16 @@ use crate::intranet::IntranetApi;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 use std::collections::HashSet;
+use tokio::sync::broadcast;
+use std::sync::Arc;
+use crate::intranet::IntranetUserDto;
+use std::collections::HashMap;
 
 mod middlewares;
 mod uow;
 mod handlers;
 mod validation;
 mod intranet;
-
-#[cfg(debug_assertions)]
-const IS_BUILD_DEBUG: bool = true;
-#[cfg(not(debug_assertions))]
-const IS_BUILD_DEBUG: bool = false;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -42,62 +41,6 @@ struct Args {
     intranet_api_key: String,
 }
 
-async fn seed(db_pool: &Pool<Postgres>) {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
-
-    let users_to_seed = vec![
-        UserEntity {
-            id: 0,
-            email: "domanski.bartlomiej@confilogi.com".into(),
-            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
-            full_name: "Bartłomiej Domański".into(),
-            role_id: 2,
-        },
-        UserEntity {
-            id: 0,
-            email: "oleksa.jacek@confilogi.com".into(),
-            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
-            full_name: "Jacek Oleksa".into(),
-            role_id: 1,
-        },
-        UserEntity {
-            id: 0,
-            email: "problem.tomasz@confilogi.com".into(),
-            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
-            full_name: "Tomasz Problem".into(),
-            role_id: 5,
-        },
-        UserEntity {
-            id: 0,
-            email: "problem.mateusz@confilogi.com".into(),
-            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
-            full_name: "Mateusz Problem".into(),
-            role_id: 4,
-        },
-        UserEntity {
-            id: 0,
-            email: "problem.edward@confilogi.com".into(),
-            password: "$2y$10$r/Q98wo137XzK6TQ.dTv0ewSgHLCq7a10P9EukVMj3eb9kY2ZQgyW".into(),
-            full_name: "Edward Problem".into(),
-            role_id: 3,
-        },
-    ];
-
-    for user in users_to_seed.iter() {
-        if !uow
-            .does_user_with_given_email_exists(&user.email)
-            .await
-            .unwrap()
-        {
-            uow.create_user(&user.email, &user.full_name, &user.password, user.role_id)
-                .await
-                .unwrap();
-        }
-    }
-
-    uow.commit().await.unwrap();
-}
-
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -114,10 +57,6 @@ async fn main() {
         .run(&db_pool)
         .await
         .expect("failed to migrate database");
-
-    if IS_BUILD_DEBUG {
-        seed(&db_pool).await;
-    }
 
     println!("Database seeded successfully.");
 
@@ -155,41 +94,192 @@ async fn main() {
         .nest("/mailing-groups", mailing_groups_router)
         .nest("/system-permissions", system_permissions_router)
         .nest("/licenses", licenses_router)
-        .with_state(db_pool);
+        .with_state(db_pool.clone());
 
     let intranet_api = IntranetApi::new(args.intranet_api_key);
 
-    tokio::spawn(job_title_synchronization_background_worker(intranet_api, CancellationToken::new()));
+    let cancellation_token = CancellationToken::new();
+
+    tokio::spawn(intranet_synchronization_background_worker(cancellation_token.clone(), db_pool, intranet_api));
 
     let tcp_listener = TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
     axum::serve(tcp_listener, router).await.unwrap();
 }
 
-async fn job_title_synchronization_background_worker(intranet_api: IntranetApi, cancellation_token: CancellationToken) {
-    loop {
-        match intranet_api.download_users().await {
-            Ok(users) => {
-                let mut job_titles = users.into_iter()
-                    .filter(|user| user.is_enabled)
-                    .map(|user| user.job_title.trim().to_string())
-                    .filter(|job_title| job_title.len() > 1)
-                    .collect::<HashSet<String>>()
-                    .into_iter()
-                    .collect::<Vec<String>>();
+mod intranet_sync {
+    enum Status {
+        DownloadingIntranetUsers,
 
-                job_titles.sort();
+        CreatingMissingJobTitle {
+            job_title_name: String,
+            current_index: i32,
+            total: i32,
+        },
 
-                eprintln!("Fetched data from intranet successfully. Job titles ({}): {}", job_titles.len(), job_titles.join("\r\n - "));
-            },
-            Err(error) => {
-                eprintln!("Intranet job titles synchronization error! Error: {error:?}");
+        CreatingMissingUser {
+            full_name: String,
+            email: String,
+            current_index: i32,
+            total: i32,
+        },
+    }
+
+    struct BackgroundWorker {
+        db_pool: Pool<Postgres>
+    }
+
+    impl IntranetBackgroundWorker {
+        pub fn new(db_pool: Pool<Postgres>) -> Self {
+            Self { db_pool }
+        }
+
+        // Creates missing job titles synchronized from intranet.
+        // Returns hash map representing all needed job title ids only for intranet users from current
+        // synchronization.
+        async fn create_missing_job_titles(
+            cancellation_token: CancellationToken,
+            intranet_users: Vec<IntranetUserDto>,
+            progress_sender: broadcast::Sender<>
+        ) -> Result<HashMap<String, i32>, JobTitleCreationError> {
+            type E = JobTitleCreationError;
+            let mut job_titles: HashMap<String, i32> = HashMap::new();
+
+            for user in &intranet_users {
+                if job_titles.contains_key(&user.job_title) {
+                    continue;
+                }
+
+                let mut uow = UnitOfWork::new(&db_pool).await.map_err(|error| E::FailedToStartTransaction(error))?;
+
+                let job_title = uow.get_job_title_by_intranet_name(&user.job_title)
+                    .await
+                    .map_error(|error| E::FailedToCheckJobTitleByIntranetName { error, job_title: user.job_title.clone() })?;
+
+                let job_title_id = match job_title {
+                    Some(job_title) => job_title.id,
+                    None => {
+                        println!("Job title {} does not exist, creating...", user.job_title);
+
+                        let created_job_title_id = uow.create_job_title(None, &user.job_title, None, None)
+                        .await
+                        .map_err(|error| 
+                                E::FailedToCreateJobTitle { error, intranet_job_title_name: user.job_title.clone() }
+                        )?;
+
+                        created_job_title_id
+                    }
+                };
+
+                job_titles.insert(user.job_title.clone(), job_title_id);
+
+                uow.commit().await.map_err(|error| 
+                    E::FailedToCommitToDatabase { error, intranet_job_title_name: user.job_title.clone() }
+                )?;
             }
-        };
 
-        tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(60)) => {},
-            _ = cancellation_token.cancelled() => break,
-        };
+            Ok(job_titles)
+        }
+
+        async fn create_missing_users(
+            cancellation_token: CancellationToken, 
+            intranet_users: IntranetUserDto
+        ) -> Result<(), UserCreationError> {
+            let hashed_password = bcrypt::hash("Confilogi89", 12)
+                .map_err(|error| UserCreationError::FailedToHashPassword(error))?;
+
+            for user in &intranet_users {
+                let mut uow = UnitOfWork::new(&db_pool)
+                    .await
+                    .map_err(|error| UserCreationError::FailedToStartTransaction(error))?;
+
+                let user_exists = uow.does_user_exist_by_ad_id(user.id).await
+                    .map_err(|error| UserCreationError::FailedToCheckIfUserExistsByAdId { error, ad_id: user.id })?;
+
+                if !user_exists {
+                    let job_title_id = *job_titles.get(&user.job_title)
+                        .ok_or_else(|| UserCreationError::NeededJobTitleHasNotBeenSynchronized { error, ad_id: user.id })?;
+
+                    let create_user_result = uow.create_user(
+                        Some(user.id), 
+                        &user.full_name, 
+                        &user.email, 
+                        hashed_password.clone(), 
+                        job_title_id
+                    ).await;
+
+                    if let Err(error) = create_user_result {
+                        eprintln!("ERROR | FAILED TO CREATE New User: {} ({})", user.full_name, user.email);
+                    } else {
+                        println!("New user: {} ({})", user.full_name, user.email);
+                    }
+                }
+
+                uow.commit().await.unwrap();
+            }
+        }
+
+        async fn run(
+            cancellation_token: CancellationToken,
+            db_pool: Pool<Postgres>,
+            intranet_api: IntranetApi,
+        ) {
+            loop {
+                let intranet_users = intranet_api.download_users().await.unwrap();
+
+                println!("Users synchronization worker received {} users.", users.len());
+
+                tokio::select! {
+                    _ = cancellation_token.cancelled() => break,
+                        _ = tokio::time::sleep(Duration::from_secs(60)) => {}
+                }
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    enum IntranetSynchronizationError {
+        FailedToCreateJobTitle(JobTitleCreationError),
+        FailedToCreateUser(UserCreationError),
+        FailedToRemoveUser(UserRemovalError),
+    }
+
+    #[derive(Debug)]
+    enum JobTitleCreationError {
+        FailedToStartTransaction(sqlx::Error),
+        FailedToExecuteDBStatement(sqlx::Error),
+        FailedToEndTransaction(sqlx::Error),
+        FailedToCheckJobTitleByIntranetName { 
+            error: sqlx::Error,
+            job_title: String
+        },
+        FailedToCreateJobTitle {
+            error: sqlx::Error,
+            intranet_job_title_name: String
+        }
+        FailedToCommitToDatabase {
+            error: sqlx::Error,
+            intranet_job_title_name: String 
+        }
+    }
+
+    #[derive(Debug)]
+    enum UserCreationError {
+        FailedToStartTransaction(sqlx::Error),
+        FailedToExecuteDBStatement(sqlx::Error),
+        FailedToEndTransaction(sqlx::Error),
+        FailedToCheckIfUserExistsByAdId {
+            error: sqlx::Error,
+            ad_id: i32
+        }
+    }
+
+    #[derive(Debug)]
+    enum UserRemovalError {
+        FailedToHashPassword(bcrypt::Error),
+        FailedToStartTransaction(sqlx::Error),
+        FailedToExecuteDBStatement(sqlx::Error),
+        FailedToEndTransaction(sqlx::Error),
     }
 }
+

@@ -113,6 +113,7 @@ pub async fn get_job_titles(State(db_pool): State<Pool<Postgres>>) -> Result<Res
         JobTitleDto {
             id: job_title.id,
             name: job_title.name,
+            intranet_name: job_title.intranet_name,
             company_department_id: job_title.company_department_id,
             parent_job_title_id: job_title.parent_job_title_id,
         }

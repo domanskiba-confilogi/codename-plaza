@@ -1,11 +1,11 @@
-INSERT INTO job_titles_have_strict_onboarding_license_mappings (job_title_id, license_id) 
-VALUES 
-	(82, 2),
-	(83, 2),
-	(84, 2),
-	(85, 2),
-	(86, 2),
-	(87, 2),
-	(88, 2),
-	(89, 2),
-	(90, 2);
+-- INSERT INTO job_titles_have_strict_onboarding_license_mappings (job_title_id, license_id) 
+-- VALUES 
+-- 	(82, 2),
+-- 	(83, 2),
+-- 	(84, 2),
+-- 	(85, 2),
+-- 	(86, 2),
+-- 	(87, 2),
+-- 	(88, 2),
+-- 	(89, 2),
+-- 	(90, 2);

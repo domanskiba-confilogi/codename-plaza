@@ -4,6 +4,9 @@ use reqwest::header::HeaderName;
 use curl::easy::{Easy2, Handler, WriteError};
 use chrono::{FixedOffset, NaiveDateTime, LocalResult};
 
+const HEADER_ACCEPT: &str = "accept";
+const HEADER_X_AUTH_TOKEN: &str = "x-auth-token";
+
 struct Collector(Vec<u8>);
 
 impl Handler for Collector {
@@ -23,21 +26,31 @@ impl IntranetApi {
     }
 
     pub async fn download_users(&self) -> Result<Vec<IntranetUserDto>, IntranetError> {
-        let mut client = Easy2::new(Collector(Vec::new()));
-        client.get(true).unwrap();
-        client.url("http://intranet.confilogi.com/api/users").unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(HEADER_X_AUTH_TOKEN, self.token.parse().map_err(|error| IntranetError::FailedToParseHeaderValue(error))?);
+        headers.insert(HEADER_ACCEPT, "application/json".parse().unwrap());
 
-        client.http_version(curl::easy::HttpVersion::V11).unwrap();
+        let client = reqwest::Client::new();
 
-        let mut headers = curl::easy::List::new();
-        headers.append(&format!("X-Auth-Token: {}", self.token)).unwrap();
-        client.http_headers(headers).unwrap();
+        let response = client.get("https://intranet.confilogi.com/api/users")
+            .version(reqwest::Version::HTTP_2)
+            .headers(headers.clone())
+            .send()
+            .await
+            .map_err(|error| IntranetError::FailedToSendRequest(error))?;
 
-        client.perform().unwrap();
+        let response_status = response.status().into();
+        let response_text = response.text().await;
 
-        let response_code = client.response_code().unwrap();
-        let contents = client.get_ref();
-        let response_text = String::from_utf8_lossy(&contents.0);
+        if response_status != 200 {
+            return Err(IntranetError::InvalidStatusError {
+                status: response_status,
+                body: format!("{:?}", response_text),
+            });
+        }
+
+        let response_text = response_text.map_err(|error| IntranetError::FailedToReadResponseBody(error))?;
+
         let raw_users: Vec<IntranetUserRaw> = serde_json::from_str(&response_text).unwrap();
 
         let mut users = Vec::with_capacity(raw_users.len());
@@ -48,39 +61,6 @@ impl IntranetApi {
 
         Ok(users)
     }
-
-    // WARN: Intranet currently has a problem with parsing lowercase headers, so we use curl
-    // version instead
-    //
-    // pub async fn download_users(&self) -> Result<Vec<IntranetUserDto>, IntranetError> {
-    //     let mut headers = HeaderMap::new();
-    //     headers.insert("x-auth-token", self.token.parse().map_err(|error| IntranetError::FailedToParseHeaderValue(error))?);
-    //     headers.insert("accept", "application/json".parse().unwrap());
-    //
-    //     let client = reqwest::Client::builder().default_headers(headers.clone()).build().unwrap();
-    //
-    //     let response = client.get("http://intranet.confilogi.com/api/users")
-    //         .headers(headers)
-    //         .send()
-    //         .await
-    //         .map_err(|error| IntranetError::FailedToSendRequest(error))?;
-    //
-    //     let response_status = response.status().into();
-    //     let response_text = response.text().await;
-    //
-    //     if response_status != 200 {
-    //         return Err(IntranetError::InvalidStatusError {
-    //             status: response_status,
-    //             body: format!("{:?}", response_text),
-    //         });
-    //     }
-    //
-    //     let response_text = response_text.map_err(|error| IntranetError::FailedToReadResponseBody(error))?;
-    //
-    //     let response_body: Vec<IntranetUserDto> = serde_json::from_str(&response_text).map_err(|error| IntranetError::FailedToDeserializeBody(error))?;
-    //
-    //     Ok(response_body)
-    // }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -112,6 +92,7 @@ struct IntranetUserRaw {
     registered_at: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct IntranetUserDto {
     pub id: i32,
     pub hostname: String,
@@ -174,26 +155,12 @@ enum IntranetUserDtoParsingError {
 
 #[derive(Debug)]
 pub enum IntranetError {
-    FailedToSendRequest(curl::Error),
-    FailedToReadResponseBody(curl::Error),
+    FailedToParseHeaderValue(reqwest::header::InvalidHeaderValue),
+    FailedToSendRequest(reqwest::Error),
+    FailedToReadResponseBody(reqwest::Error),
     FailedToDeserializeBody(serde_json::Error),
     InvalidStatusError {
         status: u16,
         body: String,
     }
 }
-
-// WARN: Intranet currently has a problem with parsing lowercase headers, so we use curl
-// version instead
-//
-// #[derive(Debug)]
-// pub enum IntranetError {
-//     FailedToParseHeaderValue(reqwest::header::InvalidHeaderValue),
-//     FailedToSendRequest(reqwest::Error),
-//     FailedToReadResponseBody(reqwest::Error),
-//     FailedToDeserializeBody(serde_json::Error),
-//     InvalidStatusError {
-//         status: u16,
-//         body: String,
-//     }
-// }

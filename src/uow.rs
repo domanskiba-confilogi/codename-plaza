@@ -40,17 +40,19 @@ impl<'a> UnitOfWork<'a> {
 
     pub async fn create_user(
         &mut self,
-        email: impl Into<String>,
+        ad_id: Option<i32>,
         full_name: impl Into<String>,
+        email: impl Into<String>,
         hashed_password: impl Into<String>,
-        role_id: i32,
+        job_title_id: i32,
     ) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
-            "INSERT INTO users (email, full_name, password, role_id) VALUES ($1, $2, $3, $4) RETURNING id;",
+            "INSERT INTO users (ad_id, email, full_name, password, job_title_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;",
+            ad_id,
             email.into(),
             full_name.into(),
             hashed_password.into(),
-            role_id
+            job_title_id,
         )
         .fetch_one(&mut *self.transaction)
         .await
@@ -113,11 +115,20 @@ impl<'a> UnitOfWork<'a> {
             .await
     }
 
-    pub async fn find_user_by_role_id(
+    pub async fn get_users_by_multiple_ad_ids(
         &mut self,
-        role_id: i32,
+        ad_ids: Vec<i32>
     ) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE role_id = $1;", role_id)
+        sqlx::query_as!(UserEntity, "SELECT * users WHERE id IN $1", ad_ids)
+            .fetch_all(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn find_user_by_job_title_id(
+        &mut self,
+        job_title_id: i32,
+    ) -> Result<Vec<UserEntity>, sqlx::Error> {
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE job_title_id = $1;", job_title_id)
             .fetch_all(&mut *self.transaction)
             .await
     }
@@ -126,6 +137,17 @@ impl<'a> UnitOfWork<'a> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users")
             .fetch_all(&mut *self.transaction)
             .await
+    }
+
+    pub async fn does_user_exist_by_ad_id(
+        &mut self,
+        ad_id: i32,
+    ) -> Result<bool, sqlx::Error> {
+        let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE ad_id = $1", ad_id)
+            .fetch_one(&mut *self.transaction)
+            .await?;
+
+        Ok(count == Some(1))
     }
 
     pub async fn get_company_departments(
@@ -149,6 +171,32 @@ impl<'a> UnitOfWork<'a> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles")
             .fetch_all(&mut *self.transaction)
             .await
+    }
+
+    pub async fn get_job_title_by_intranet_name(&mut self, intranet_name: impl Into<String>) -> Result<Option<JobTitleEntity>, sqlx::Error> {
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = $1;", intranet_name.into())
+            .fetch_optional(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn does_job_with_given_intranet_name_exists(&mut self, intranet_name: String) -> Result<bool, sqlx::Error> {
+        let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM job_titles WHERE intranet_name = $1", intranet_name)
+            .fetch_one(&mut *self.transaction)
+            .await?;
+
+        Ok(count == Some(1))
+    }
+
+    pub async fn create_job_title(&mut self, name: Option<String>, intranet_name: impl Into<String>, company_department_id: Option<i32>, parent_job_title_id: Option<i32>) -> Result<i32, sqlx::Error> {
+        sqlx::query_scalar!(
+            "INSERT INTO job_titles (name, intranet_name, company_department_id, parent_job_title_id) VALUES ($1, $2, $3, $4) RETURNING id;",
+            name,
+            intranet_name.into(),
+            company_department_id,
+            parent_job_title_id
+        )
+        .fetch_one(&mut *self.transaction)
+        .await
     }
 
     pub async fn get_authorization_token_ids_by_user_id(&mut self, user_id: i32) -> Result<Vec<i32>, sqlx::Error> {
@@ -216,7 +264,8 @@ pub struct SystemPermissionEntity {
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
 pub struct JobTitleEntity {
     pub id: i32,
-    pub name: String,
+    pub name: Option<String>,
+    pub intranet_name: String,
     pub company_department_id: Option<i32>,
     pub parent_job_title_id: Option<i32>,
 }
@@ -249,8 +298,9 @@ pub struct CompanyDepartmentEntity {
 #[derive(sqlx::FromRow, Clone, Debug, Default)]
 pub struct UserEntity {
     pub id: i32,
+    pub ad_id: Option<i32>,
     pub email: String,
     pub password: String,
     pub full_name: String,
-    pub role_id: i32,
+    pub job_title_id: Option<i32>,
 }

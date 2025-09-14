@@ -37,7 +37,8 @@ pub struct LicenseDto {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct JobTitleDto {
     pub id: i32,
-    pub name: String,
+    pub name: Option<String>,
+    pub intranet_name: String,
     pub company_department_id: Option<i32>,
     pub parent_job_title_id: Option<i32>,
 }

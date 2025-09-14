@@ -18,6 +18,6 @@ sqlx = { version = "0.8.6", features = ["macros", "chrono", "postgres", "runtime
 tokio = { version = "1.47.1", features = ["full"] }
 connector = { path = "./crates/connector", features = ["server-side"] }
 email_address = "0.2.9"
-reqwest = "0.12.23"
+reqwest = { version = "0.12.23", features = ["http2", "native-tls-alpn"] }
 tokio-util = "0.7.16"
 curl = "0.4.49"
