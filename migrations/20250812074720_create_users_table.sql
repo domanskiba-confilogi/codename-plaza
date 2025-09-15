@@ -3,6 +3,6 @@ CREATE TABLE users (
 	ad_id INTEGER DEFAULT NULL UNIQUE,
 	full_name VARCHAR(64) NOT NULL,
 	email VARCHAR(64) NOT NULL UNIQUE,
-	password VARCHAR(64) NOT NULL,
+	password VARCHAR(64) DEFAULT NULL,
 	job_title_id INTEGER NOT NULL REFERENCES job_titles (id)
 );
