@@ -1,18 +1,10 @@
 use crate::uow::{UnitOfWork, UserEntity};
 use axum::routing::{get, post};
-use axum_cookie::CookieLayer;
 use clap::Parser;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres};
 use tokio::net::TcpListener;
 use crate::intranet::IntranetApi;
-use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
-use std::collections::HashSet;
-use tokio::sync::broadcast;
-use std::sync::Arc;
-use crate::intranet::IntranetUserDto;
-use std::collections::HashMap;
 
 mod middlewares;
 mod uow;
@@ -100,7 +92,9 @@ async fn main() {
 
     let cancellation_token = CancellationToken::new();
 
-    tokio::spawn(intranet_synchronization_background_worker(cancellation_token.clone(), db_pool, intranet_api));
+    let worker = intranet_sync::BackgroundWorker::new(db_pool, intranet_api);
+    tokio::spawn(worker.run(cancellation_token.clone()));
+
 
     let tcp_listener = TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
@@ -108,30 +102,43 @@ async fn main() {
 }
 
 mod intranet_sync {
+    use sqlx::Pool;
+    use sqlx::Postgres;
+    use crate::intranet::IntranetApi;
+    use crate::intranet::IntranetUserDto;
+    use tokio::time::Duration;
+    use tokio_util::sync::CancellationToken;
+    use tokio::sync::broadcast;
+    use std::collections::HashMap;
+    use crate::UnitOfWork;
+    use std::sync::Arc;
+
+    #[derive(Debug)]
     enum Status {
         DownloadingIntranetUsers,
 
-        CreatingMissingJobTitle {
-            job_title_name: String,
-            current_index: i32,
-            total: i32,
+        CreatingJobTitlesChunk {
+            job_titles: Vec<String>,
+            current_index: u32,
+            total_items: u32,
         },
 
         CreatingMissingUser {
             full_name: String,
             email: String,
-            current_index: i32,
-            total: i32,
+            current_index: u32,
+            total: u32,
         },
     }
 
-    struct BackgroundWorker {
-        db_pool: Pool<Postgres>
+    pub struct BackgroundWorker {
+        db_pool: Pool<Postgres>,
+        intranet_api: IntranetApi,
     }
 
-    impl IntranetBackgroundWorker {
-        pub fn new(db_pool: Pool<Postgres>) -> Self {
-            Self { db_pool }
+    impl BackgroundWorker {
+        pub fn new(db_pool: Pool<Postgres>, intranet_api: IntranetApi) -> Self {
+            Self { db_pool, intranet_api }
         }
 
         // Creates missing job titles synchronized from intranet.
@@ -139,95 +146,231 @@ mod intranet_sync {
         // synchronization.
         async fn create_missing_job_titles(
             cancellation_token: CancellationToken,
-            intranet_users: Vec<IntranetUserDto>,
-            progress_sender: broadcast::Sender<>
+            db_pool: &Pool<Postgres>,
+            intranet_users: &[IntranetUserDto],
+            progress_sender: broadcast::Sender<Arc<Status>>
         ) -> Result<HashMap<String, i32>, JobTitleCreationError> {
-            type E = JobTitleCreationError;
             let mut job_titles: HashMap<String, i32> = HashMap::new();
 
-            for user in &intranet_users {
-                if job_titles.contains_key(&user.job_title) {
-                    continue;
-                }
+            let process_chunk = async |
+                cancellation_token: CancellationToken,
+                db_pool: &Pool<Postgres>, 
+                job_titles_chunk: &[String], 
+                job_titles_cache: &mut HashMap<String, i32>
+            | -> Result<(), JobTitleCreationError> {
+                type E = JobTitleCreationError;
 
                 let mut uow = UnitOfWork::new(&db_pool).await.map_err(|error| E::FailedToStartTransaction(error))?;
 
-                let job_title = uow.get_job_title_by_intranet_name(&user.job_title)
-                    .await
-                    .map_error(|error| E::FailedToCheckJobTitleByIntranetName { error, job_title: user.job_title.clone() })?;
-
-                let job_title_id = match job_title {
-                    Some(job_title) => job_title.id,
-                    None => {
-                        println!("Job title {} does not exist, creating...", user.job_title);
-
-                        let created_job_title_id = uow.create_job_title(None, &user.job_title, None, None)
+                for job_title_to_process in job_titles_chunk {
+                    let job_title_entity = uow.get_job_title_by_intranet_name(job_title_to_process)
                         .await
-                        .map_err(|error| 
-                                E::FailedToCreateJobTitle { error, intranet_job_title_name: user.job_title.clone() }
-                        )?;
+                        .map_err(|error| E::FailedToCheckJobTitleByIntranetName { 
+                            error, 
+                            job_title: job_title_to_process.clone() 
+                        })?;
 
-                        created_job_title_id
-                    }
-                };
+                    let job_title_id = match job_title_entity {
+                        Some(job_title) => job_title.id,
+                        None => {
+                            println!("Job title {} does not exist, creating...", job_title_to_process);
 
-                job_titles.insert(user.job_title.clone(), job_title_id);
+                            let created_job_title_id = uow.create_job_title(None, job_title_to_process, None, None)
+                                .await
+                                .map_err(|error| E::FailedToCreateJobTitle { 
+                                    error, 
+                                    intranet_job_title_name: job_title_to_process.clone() 
+                                })?;
 
-                uow.commit().await.map_err(|error| 
-                    E::FailedToCommitToDatabase { error, intranet_job_title_name: user.job_title.clone() }
-                )?;
+                            created_job_title_id
+                        }
+                    };
+
+                    job_titles_cache.insert(job_title_to_process.clone(), job_title_id);
+                }
+
+                uow.commit().await.map_err(|error| E::FailedToCommitToDatabase { 
+                    error, 
+                    intranet_job_titles_chunk: job_titles_chunk.into_iter().cloned().collect::<Vec<String>>(), 
+                })?;
+
+                Ok(())
+            };
+
+            // extract unique job titles
+            let mut intranet_job_titles = intranet_users.iter()
+                .map(|user| user.job_title.clone())
+                .collect::<Vec<String>>();
+
+            intranet_job_titles.dedup();
+
+            // prepare data for processing
+            let total_to_synchronize = intranet_job_titles.len() as u32;
+
+            let (
+                intranet_job_titles_chunks, 
+                intranet_job_titles_chunk_remainder
+            ) = intranet_job_titles.as_chunks::<10>();
+
+            let mut total_synchronized: u32 = 0;
+
+            // process chunks
+            for intranet_job_titles_chunk in intranet_job_titles_chunks {
+                let _ = progress_sender.send(Arc::new(Status::CreatingJobTitlesChunk {
+                    job_titles: intranet_job_titles_chunk.iter().cloned().collect::<Vec<String>>(),
+                    current_index: total_synchronized,
+                    total_items: total_to_synchronize
+                })).unwrap();
+
+                process_chunk(
+                    cancellation_token.clone(),
+                    &db_pool,
+                    intranet_job_titles_chunk, 
+                    &mut job_titles
+                ).await?;
+
+                total_synchronized += intranet_job_titles_chunk.len() as u32;
             }
+
+            // process remainder
+            let _ = progress_sender.send(Arc::new(Status::CreatingJobTitlesChunk {
+                job_titles: intranet_job_titles_chunk_remainder.iter().cloned().collect::<Vec<String>>(),
+                current_index: total_synchronized,
+                total_items: total_to_synchronize
+            })).unwrap();
+
+            process_chunk(
+                cancellation_token,
+                &db_pool, 
+                intranet_job_titles_chunk_remainder,
+                &mut job_titles
+            ).await?;
 
             Ok(job_titles)
         }
 
-        async fn create_missing_users(
+        async fn synchronize_users_from_intranet(
             cancellation_token: CancellationToken, 
-            intranet_users: IntranetUserDto
+            intranet_users: &[IntranetUserDto],
+            job_title_cache: &HashMap<String, i32>,
+            progress_sender: broadcast::Sender<Arc<Status>>
         ) -> Result<(), UserCreationError> {
             let hashed_password = bcrypt::hash("Confilogi89", 12)
                 .map_err(|error| UserCreationError::FailedToHashPassword(error))?;
 
-            for user in &intranet_users {
+            let process_chunk = async |
+            db_pool: &Pool<Postgres>,
+            hashed_password: &str,
+            users_chunk: &[IntranetUserDto],
+            job_title_cache: &HashMap<String, i32>
+            | -> Result<(), UserCreationError> {
+                type E = UserCreationError;
                 let mut uow = UnitOfWork::new(&db_pool)
                     .await
-                    .map_err(|error| UserCreationError::FailedToStartTransaction(error))?;
+                    .map_err(|error| E::FailedToStartTransaction(error))?;
 
-                let user_exists = uow.does_user_exist_by_ad_id(user.id).await
-                    .map_err(|error| UserCreationError::FailedToCheckIfUserExistsByAdId { error, ad_id: user.id })?;
+                let ad_ids = users_chunk.iter().map(|user| user.id).collect::<Vec<i32>>();
 
-                if !user_exists {
-                    let job_title_id = *job_titles.get(&user.job_title)
-                        .ok_or_else(|| UserCreationError::NeededJobTitleHasNotBeenSynchronized { error, ad_id: user.id })?;
+                let already_existing_users = uow.get_users_by_multiple_ad_ids(&ad_ids)
+                    .await
+                    .map_err(|error| E::FailedToGetUsersByMultipleAdIds { error, ad_ids })?;
 
-                    let create_user_result = uow.create_user(
-                        Some(user.id), 
-                        &user.full_name, 
-                        &user.email, 
-                        hashed_password.clone(), 
-                        job_title_id
-                    ).await;
+                // 
+                // WARN: .any() method on std::iter::Map modifies the value. Please Do not search inside an
+                // iterator that does not have an item that you expect it to have. (In case somebody
+                // reuses already_existing_ad_ids variable)
+                //
+                let mut already_existing_ad_ids = already_existing_users
+                    .iter()
+                    .map(|user| user.ad_id);
 
-                    if let Err(error) = create_user_result {
-                        eprintln!("ERROR | FAILED TO CREATE New User: {} ({})", user.full_name, user.email);
-                    } else {
-                        println!("New user: {} ({})", user.full_name, user.email);
+                let non_existent_intranet_users = users_chunk
+                    .iter()
+                    .filter(|user| !already_existing_ad_ids.any(|already_existing_ad_id| already_existing_ad_id.expect("Select should have selected users with ad_id already set.") == user.id));
+
+                // Create non-existent users
+
+                for non_existent_intranet_user in non_existent_intranet_users {
+                    let job_title_id = job_title_cache.get(&non_existent_intranet_user.job_title)
+                        .ok_or_else(|| {
+                            E::FailedToGetJobTitleIdFromCache(non_existent_intranet_user.job_title.clone())
+                        })?;
+
+                    let _ = uow.create_user(
+                        Some(non_existent_intranet_user.id),
+                        &non_existent_intranet_user.full_name,
+                        &non_existent_intranet_user.email,
+                        &hashed_password,
+                        *job_title_id
+                    )
+                        .await
+                        .map_err(|error| E::FailedToCreateUser { error, intranet_user: non_existent_intranet_user.clone() })?;
+                }
+
+                // Update already existing users if their data has changed
+
+                for already_existing_user in already_existing_users {
+                    // Get intranet's job title name of currently set job title for user in our db
+                    let currently_set_job_title_as_intranet_name = job_title_cache.iter()
+                        .find(|(cached_job_title_name, cached_job_title_id)| **cached_job_title_id == already_existing_user.job_title_id)
+                        .map(|(cached_job_title_name, _)| cached_job_title_name)
+                        .ok_or_else(|| {
+                            E::FailedToGetJobTitleNameFromCache(already_existing_user.job_title_id)
+                        })?;
+
+                    // Get corresponding user from current intranet fetch matching user from our db
+
+                    let intranet_user = users_chunk.iter()
+                        .find(|user| user.id == already_existing_user.ad_id.expect("Select should have selected users with ad_id already set."))
+                        .ok_or_else(|| {
+                            E::FailedToGetIntranetUserByAdIdFromCache(already_existing_user.ad_id.expect("Select should have selected users with ad_id already set."))
+                        })?;
+
+                    // if not equal, then update
+                    let is_eq = intranet_user.email == already_existing_user.email && 
+                    intranet_user.full_name == already_existing_user.full_name && 
+                    *currently_set_job_title_as_intranet_name == intranet_user.job_title;
+
+                    if !is_eq {
+                        let new_job_title_id = job_title_cache.get(&intranet_user.job_title)
+                            .ok_or_else(|| {
+                                E::FailedToGetJobTitleIdFromCache(intranet_user.job_title.clone())
+                            })?;
+
+                        let _ = uow.update_user(
+                            already_existing_user.id, 
+                            Some(intranet_user.id), // ad_id
+                            &intranet_user.full_name, 
+                            &intranet_user.email, 
+                            hashed_password,
+                            *new_job_title_id
+                        ).await
+                            .map_err(|error| E::FailedToUpdateUser { error, intranet_user: intranet_user.clone() })?;
                     }
                 }
 
-                uow.commit().await.unwrap();
-            }
+                let _ = uow.commit().await.map_err(|error| E::FailedToCommitTransaction(error))?;
+
+                Ok(())
+            };
+
+            todo!()
         }
 
-        async fn run(
+        pub async fn run(
+            self,
             cancellation_token: CancellationToken,
-            db_pool: Pool<Postgres>,
-            intranet_api: IntranetApi,
         ) {
             loop {
-                let intranet_users = intranet_api.download_users().await.unwrap();
+                let intranet_users = self.intranet_api.download_users().await.unwrap();
 
-                println!("Users synchronization worker received {} users.", users.len());
+                println!("Users synchronization worker received {} users.", intranet_users.len());
+
+                let (progress_sender, progress_reader) = broadcast::channel(2148);
+
+                let job_title_cache = Self::create_missing_job_titles(cancellation_token.clone(), &self.db_pool, &intranet_users, progress_sender.clone()).await.unwrap();
+
+                Self::synchronize_users_from_intranet(cancellation_token.clone(), &intranet_users, &job_title_cache, progress_sender).await.unwrap();
 
                 tokio::select! {
                     _ = cancellation_token.cancelled() => break,
@@ -241,7 +384,7 @@ mod intranet_sync {
     enum IntranetSynchronizationError {
         FailedToCreateJobTitle(JobTitleCreationError),
         FailedToCreateUser(UserCreationError),
-        FailedToRemoveUser(UserRemovalError),
+        FailedToRemoveUser(UserRemovalError)
     }
 
     #[derive(Debug)]
@@ -256,10 +399,10 @@ mod intranet_sync {
         FailedToCreateJobTitle {
             error: sqlx::Error,
             intranet_job_title_name: String
-        }
+        },
         FailedToCommitToDatabase {
             error: sqlx::Error,
-            intranet_job_title_name: String 
+            intranet_job_titles_chunk: Vec<String>,
         }
     }
 
@@ -268,18 +411,35 @@ mod intranet_sync {
         FailedToStartTransaction(sqlx::Error),
         FailedToExecuteDBStatement(sqlx::Error),
         FailedToEndTransaction(sqlx::Error),
+        FailedToHashPassword(bcrypt::BcryptError),
+        FailedToGetJobTitleIdFromCache(String),
+        FailedToGetJobTitleNameFromCache(i32),
+        FailedToGetUsersByMultipleAdIds {
+            error: sqlx::Error,
+            ad_ids: Vec<i32>,
+        },
         FailedToCheckIfUserExistsByAdId {
             error: sqlx::Error,
             ad_id: i32
-        }
+        },
+        FailedToCreateUser {
+            error: sqlx::Error,
+            intranet_user: IntranetUserDto,
+        },
+        FailedToUpdateUser {
+            error: sqlx::Error,
+            intranet_user: IntranetUserDto,
+        },
+        FailedToGetIntranetUserByAdIdFromCache(i32),
+        FailedToCommitTransaction(sqlx::Error),
     }
 
     #[derive(Debug)]
     enum UserRemovalError {
-        FailedToHashPassword(bcrypt::Error),
+        FailedToHashPassword(bcrypt::BcryptError),
         FailedToStartTransaction(sqlx::Error),
         FailedToExecuteDBStatement(sqlx::Error),
-        FailedToEndTransaction(sqlx::Error),
+        FailedToEndTransaction(sqlx::Error)
     }
 }
 

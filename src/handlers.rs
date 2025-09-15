@@ -8,9 +8,6 @@ use axum::{
 use axum_macros::debug_handler;
 use sqlx::{Pool, Postgres};
 use crate::{UnitOfWork, UserEntity};
-use std::borrow::Cow;
-use connector::*;
-use serde_json::json;
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
 use crate::validation::{LoginValidator, CreateSystemPermissionValidator};

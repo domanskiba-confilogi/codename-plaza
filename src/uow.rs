@@ -1,5 +1,4 @@
 use sqlx::{Pool, Postgres, Transaction};
-use std::borrow::Cow;
 
 pub struct UnitOfWork<'a> {
     transaction: Transaction<'a, sqlx::Postgres>,
@@ -41,21 +40,45 @@ impl<'a> UnitOfWork<'a> {
     pub async fn create_user(
         &mut self,
         ad_id: Option<i32>,
-        full_name: impl Into<String>,
-        email: impl Into<String>,
-        hashed_password: impl Into<String>,
+        full_name: &str,
+        email: &str,
+        hashed_password: &str,
         job_title_id: i32,
     ) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
             "INSERT INTO users (ad_id, email, full_name, password, job_title_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;",
             ad_id,
-            email.into(),
-            full_name.into(),
-            hashed_password.into(),
-            job_title_id,
+            email,
+            full_name,
+            hashed_password,
+            job_title_id
         )
         .fetch_one(&mut *self.transaction)
         .await
+    }
+
+    pub async fn update_user(
+        &mut self,
+        id: i32,
+        ad_id: Option<i32>,
+        full_name: &str,
+        email: &str,
+        hashed_password: &str,
+        job_title_id: i32,
+    ) -> Result<(), sqlx::Error> {
+        let _ = sqlx::query!(
+            "UPDATE users SET ad_id = $1, email = $2, full_name = $3, password = $4, job_title_id = $5 WHERE id = $6;",
+            ad_id,
+            email,
+            full_name,
+            hashed_password,
+            job_title_id,
+            id
+        )
+            .execute(&mut *self.transaction)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn delete_user_by_id(&mut self, id: i32) -> Result<(), sqlx::Error> {
@@ -117,9 +140,9 @@ impl<'a> UnitOfWork<'a> {
 
     pub async fn get_users_by_multiple_ad_ids(
         &mut self,
-        ad_ids: Vec<i32>
+        ad_ids: &[i32]
     ) -> Result<Vec<UserEntity>, sqlx::Error> {
-        sqlx::query_as!(UserEntity, "SELECT * users WHERE id IN $1", ad_ids)
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE ad_id = ANY($1)", ad_ids)
             .fetch_all(&mut *self.transaction)
             .await
     }
@@ -164,6 +187,14 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE company_department_id = $1", company_department_id)
             .fetch_all(&mut *self.transaction)
+            .await
+    }
+    // Argument intranet_names must be a &[String]. Other type will not go through the macros of
+    // sqlx.
+    // ------------------------------------------------------------------------------- HERE
+    pub async fn get_job_titles_by_multiple_intranet_names(&mut self, intranet_names: &[String]) -> Result<Option<JobTitleEntity>, sqlx::Error> {
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = ANY($1);", intranet_names)
+            .fetch_optional(&mut *self.transaction)
             .await
     }
 
@@ -302,5 +333,5 @@ pub struct UserEntity {
     pub email: String,
     pub password: String,
     pub full_name: String,
-    pub job_title_id: Option<i32>,
+    pub job_title_id: i32,
 }

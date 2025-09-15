@@ -1,7 +1,5 @@
 use reqwest::header::HeaderMap;
-use reqwest::header::HeaderValue;
-use reqwest::header::HeaderName;
-use curl::easy::{Easy2, Handler, WriteError};
+use curl::easy::{Handler, WriteError};
 use chrono::{FixedOffset, NaiveDateTime, LocalResult};
 
 const HEADER_ACCEPT: &str = "accept";
@@ -92,7 +90,7 @@ struct IntranetUserRaw {
     registered_at: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntranetUserDto {
     pub id: i32,
     pub hostname: String,
