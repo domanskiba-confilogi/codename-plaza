@@ -1,4 +1,5 @@
 use sqlx::{Pool, Postgres, Transaction};
+use std::fmt;
 
 pub struct UnitOfWork<'a> {
     transaction: Transaction<'a, sqlx::Postgres>,
@@ -37,21 +38,17 @@ impl<'a> UnitOfWork<'a> {
         return Ok(count == Some(1));
     }
 
-    pub async fn create_user(
+    pub async fn create_user<'b>(
         &mut self,
-        ad_id: Option<i32>,
-        full_name: &str,
-        email: &str,
-        hashed_password: &str,
-        job_title_id: i32,
+        args: &'b CreateUserArgs
     ) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
             "INSERT INTO users (ad_id, email, full_name, password, job_title_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;",
-            ad_id,
-            email,
-            full_name,
-            hashed_password,
-            job_title_id
+            args.ad_id,
+            args.email,
+            args.full_name,
+            args.hashed_password,
+            args.job_title_id
         )
         .fetch_one(&mut *self.transaction)
         .await
@@ -59,21 +56,16 @@ impl<'a> UnitOfWork<'a> {
 
     pub async fn update_user(
         &mut self,
-        id: i32,
-        ad_id: Option<i32>,
-        full_name: &str,
-        email: &str,
-        hashed_password: &str,
-        job_title_id: i32,
+        args: &UpdateUserArgs
     ) -> Result<(), sqlx::Error> {
         let _ = sqlx::query!(
             "UPDATE users SET ad_id = $1, email = $2, full_name = $3, password = $4, job_title_id = $5 WHERE id = $6;",
-            ad_id,
-            email,
-            full_name,
-            hashed_password,
-            job_title_id,
-            id
+            args.ad_id,
+            args.email,
+            args.full_name,
+            args.hashed_password,
+            args.job_title_id,
+            args.id
         )
             .execute(&mut *self.transaction)
             .await?;
@@ -134,6 +126,15 @@ impl<'a> UnitOfWork<'a> {
         email: impl Into<String>,
     ) -> Result<Option<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE email = $1;", email.into())
+            .fetch_optional(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn find_user_by_ad_id(
+        &mut self,
+        ad_id: i32
+    ) -> Result<Option<UserEntity>, sqlx::Error> {
+        sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE ad_id = $1;", ad_id)
             .fetch_optional(&mut *self.transaction)
             .await
     }
@@ -204,8 +205,8 @@ impl<'a> UnitOfWork<'a> {
             .await
     }
 
-    pub async fn get_job_title_by_intranet_name(&mut self, intranet_name: impl Into<String>) -> Result<Option<JobTitleEntity>, sqlx::Error> {
-        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = $1;", intranet_name.into())
+    pub async fn get_job_title_by_intranet_name<'b>(&mut self, intranet_name: &'b str)-> Result<Option<JobTitleEntity>, sqlx::Error> {
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = $1;", intranet_name)
             .fetch_optional(&mut *self.transaction)
             .await
     }
@@ -218,13 +219,13 @@ impl<'a> UnitOfWork<'a> {
         Ok(count == Some(1))
     }
 
-    pub async fn create_job_title(&mut self, name: Option<String>, intranet_name: impl Into<String>, company_department_id: Option<i32>, parent_job_title_id: Option<i32>) -> Result<i32, sqlx::Error> {
+    pub async fn create_job_title<'b>(&mut self, args: CreateJobTitleArgs<'b>) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
             "INSERT INTO job_titles (name, intranet_name, company_department_id, parent_job_title_id) VALUES ($1, $2, $3, $4) RETURNING id;",
-            name,
-            intranet_name.into(),
-            company_department_id,
-            parent_job_title_id
+            args.name,
+            args.intranet_name,
+            args.company_department_id,
+            args.parent_job_title_id
         )
         .fetch_one(&mut *self.transaction)
         .await
@@ -326,12 +327,75 @@ pub struct CompanyDepartmentEntity {
     pub name: String,
 }
 
-#[derive(sqlx::FromRow, Clone, Debug, Default)]
+#[derive(sqlx::FromRow, Clone, Default)]
 pub struct UserEntity {
     pub id: i32,
     pub ad_id: Option<i32>,
-    pub email: String,
-    pub password: String,
+    pub email: Option<String>,
+    pub password: Option<String>,
     pub full_name: String,
     pub job_title_id: i32,
+}
+
+impl fmt::Debug for UserEntity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserEntity")
+            .field("id", &self.id)
+            .field("ad_id", &self.ad_id)
+            .field("email", &self.full_name)
+            .field("password", &"REDACTED")
+            .field("full_name", &self.full_name)
+            .field("job_title_id", &self.job_title_id)
+            .finish()
+    }
+}
+
+pub struct CreateUserArgs {
+    pub ad_id: Option<i32>,
+    pub email: Option<String>,
+    pub hashed_password: Option<String>,
+    pub full_name: String,
+    pub job_title_id: i32,
+}
+
+impl fmt::Debug for CreateUserArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CreateUserArgs")
+            .field("ad_id", &self.ad_id)
+            .field("email", &self.full_name)
+            .field("hashed_password", &"REDACTED")
+            .field("full_name", &self.full_name)
+            .field("job_title_id", &self.job_title_id)
+            .finish()
+    }
+}
+
+#[derive(sqlx::FromRow, Clone, Default)]
+pub struct UpdateUserArgs {
+    pub id: i32,
+    pub ad_id: Option<i32>,
+    pub email: Option<String>,
+    pub hashed_password: Option<String>,
+    pub full_name: String,
+    pub job_title_id: i32,
+}
+
+impl fmt::Debug for UpdateUserArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UpdateUserArgs")
+            .field("id", &self.id)
+            .field("ad_id", &self.ad_id)
+            .field("email", &self.full_name)
+            .field("hashed_password", &"REDACTED")
+            .field("full_name", &self.full_name)
+            .field("job_title_id", &self.job_title_id)
+            .finish()
+    }
+}
+
+pub struct CreateJobTitleArgs<'a> {
+    pub name: Option<&'a str>,
+    pub intranet_name: &'a str,
+    pub company_department_id: Option<i32>,
+    pub parent_job_title_id: Option<i32>,
 }

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+url = "2.5.7"
 axum = { version = "0.8.4", features = ["macros"] }
 axum-cookie = "0.2.3"
 axum-macros = "0.5.0"

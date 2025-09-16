@@ -1,18 +1,8 @@
 use reqwest::header::HeaderMap;
-use curl::easy::{Handler, WriteError};
 use chrono::{FixedOffset, NaiveDateTime, LocalResult};
 
 const HEADER_ACCEPT: &str = "accept";
 const HEADER_X_AUTH_TOKEN: &str = "x-auth-token";
-
-struct Collector(Vec<u8>);
-
-impl Handler for Collector {
-    fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
-        self.0.extend_from_slice(data);
-        Ok(data.len())
-    }
-}
 
 pub struct IntranetApi {
     token: String,
@@ -62,7 +52,7 @@ impl IntranetApi {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct IntranetUserRaw {
+pub struct IntranetUserRaw {
     #[serde(rename = "employID")]
     id: i32,
 
@@ -119,7 +109,7 @@ impl IntranetUserDto {
             let offset = FixedOffset::east_opt(3600 * 1).unwrap();
 
             let naive_registered_at = NaiveDateTime::parse_from_str(&registered_at, "%Y-%m-%d %H:%M:%S")
-                .map_err(|error| E::InvalidRegistrationDate(registered_at.clone()))?;
+                .map_err(|_| E::InvalidRegistrationDate(registered_at.clone()))?;
 
             let registered_at = match naive_registered_at.and_local_timezone(offset) {
                 LocalResult::Single(result) => result,
@@ -146,7 +136,7 @@ impl IntranetUserDto {
 }
 
 #[derive(Debug)]
-enum IntranetUserDtoParsingError {
+pub enum IntranetUserDtoParsingError {
     InvalidRegistrationDate(String),
     InvalidIsEnabledValue(i32),
 }
@@ -156,7 +146,6 @@ pub enum IntranetError {
     FailedToParseHeaderValue(reqwest::header::InvalidHeaderValue),
     FailedToSendRequest(reqwest::Error),
     FailedToReadResponseBody(reqwest::Error),
-    FailedToDeserializeBody(serde_json::Error),
     InvalidStatusError {
         status: u16,
         body: String,

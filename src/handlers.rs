@@ -28,7 +28,12 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
     if let Some(user) = uow.find_user_by_email(&json.email).await.unwrap() {
         let request_minimum_time = rand::random::<u32>() % 300;
 
-        let password_matches = bcrypt::verify(json.password, &user.password).unwrap();
+        let password_matches = match user.password {
+            Some(password) => {
+                bcrypt::verify(json.password, &password).unwrap()
+            }
+            None => false
+        };
 
         if !password_matches {
             return Err(ValidationError {
@@ -50,7 +55,7 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
 
         uow.commit().await.unwrap();
 
-        let mut wait_for_ms = (start_timestamp.elapsed().as_millis() as i64 + 300i64) - request_minimum_time as i64;
+        let wait_for_ms = (start_timestamp.elapsed().as_millis() as i64 + 300i64) - request_minimum_time as i64;
 
         if wait_for_ms > 0 {
             tokio::time::sleep(Duration::from_millis(wait_for_ms as u64)).await;

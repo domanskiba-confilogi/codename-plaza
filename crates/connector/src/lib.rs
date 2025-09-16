@@ -58,7 +58,7 @@ pub struct SystemPermissionToJobTitleMappingDto {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct UserDto {
     pub id: i32,
-    pub email: String,
+    pub email: Option<String>,
     pub full_name: String,
 }
 
