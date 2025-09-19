@@ -181,6 +181,8 @@ pub mod i18n {
         Email,
         Password,
         SystemPermissionName,
+        PaginationPage,
+        PaginationPerPage,
     }
 
     impl Translate for FieldTranslationKey {
@@ -199,6 +201,16 @@ pub mod i18n {
                 FieldTranslationKey::SystemPermissionName => {
                     match language {
                         Language::Polish => format!("name"),
+                    }
+                }
+                FieldTranslationKey::PaginationPage => {
+                    match language {
+                        Language::Polish => format!("Numer porządkowy strony"),
+                    }
+                }
+                FieldTranslationKey::PaginationPerPage => {
+                    match language {
+                        Language::Polish => format!("Ilość wierszy na jednej stronie"),
                     }
                 }
             }
@@ -220,6 +232,14 @@ pub mod i18n {
             property_name: FieldTranslationKey,
         },
         InvalidCredentials,
+        NumberTooSmall {
+            property_name: FieldTranslationKey,
+            min: u32,
+        },
+        NumberTooBig {
+            property_name: FieldTranslationKey,
+            max: u32,
+        }
     }
 
     impl Translate for ValidationTranslationKey {
@@ -243,6 +263,16 @@ pub mod i18n {
                 ValidationTranslationKey::InvalidCredentials => {
                     match language {
                         Language::Polish => format!("Email lub hasło są nieprawidłowe")
+                    }
+                }
+                ValidationTranslationKey::NumberTooSmall { property_name, min } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" ma za małą wartość! Minimum: {min}", property_name.translate(language))
+                    }
+                }
+                ValidationTranslationKey::NumberTooBig { property_name, max } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" ma za dużą wartość! Maximum: {max}", property_name.translate(language))
                     }
                 }
             }

@@ -16,6 +16,32 @@ use crate::AppState;
 use url::Url;
 use anyhow::Context;
 
+struct GetUsersPaginationQuery {
+    per_page: u32,
+    page: u32,
+}
+
+struct GetUsersPaginationResponse {
+    users: Vec<UserDto>,
+    total: u32,
+    total_pages: u32,
+}
+
+pub async fn get_users(State(state): State<Arc<AppState>>, Query(query): Query<GetUsersPaginationQuery>) -> Result<Response, InternalServerError> {
+    if let Err(error) = GetUsersPaginationValidator {
+        per_page: query.per_page,
+        page: query.page,
+    }.validate() {
+        return Ok(error.into_with_translation(Language::Polish).into_response());
+    }
+
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    uow.get_users_paginated(query.per_page, query.page).await?;
+
+    uow.commit().await?;
+}
+
 #[debug_handler]
 pub async fn login(State(state): State<Arc<AppState>>, Json(json): Json<LoginRequestBody>) -> Result<Response, InternalServerError> {
     if let Err(error) = (LoginValidator {

@@ -113,6 +113,38 @@ impl<'a> Validator for LoginValidator<'a> {
     }
 }
 
+pub struct GetPaginatedUsersValidator {
+    pub per_page: u32,
+    pub page: u32,
+}
+
+impl<'a> Validator for GetPaginatedUsersValidator {
+    fn validate(self) -> Result<(), ValidationError> {
+        UnsignedIntegerTooSmallValidator {
+            property_name: FieldTranslationKey::PaginationPerPage,
+            min: 1
+        }.validate()?;
+
+        UnsignedIntegerTooBigValidator {
+            property_name: FieldTranslationKey::PaginationPerPage,
+            max: 30,
+        }.validate()?;
+
+        UnsignedIntegerTooSmallValidator {
+            property_name: FieldTranslationKey::PaginationPage,
+            min: 1
+        }.validate()?;
+
+        UnsignedIntegerTooBigValidator {
+            property_name: FieldTranslationKey::PaginationPage,
+            max: 999_999_999,
+        }.validate()?;
+
+        Ok(())
+    }
+}
+
+
 pub struct CreateSystemPermissionValidator<'a> {
     pub name: &'a str,
     pub subpermission_of_id: Option<i32>
@@ -131,6 +163,50 @@ impl<'a> Validator for CreateSystemPermissionValidator<'a> {
             value: self.name,
             max_length: 64
         }.validate()?;
+
+        Ok(())
+    }
+}
+
+struct UnsignedIntegerTooSmallValidator {
+    property_name: FieldTranslationKey,
+    value: u32,
+    min: u32,
+}
+
+impl<'a> Validator for UnsignedIntegerTooSmallValidator {
+    fn validate(self) -> Result<(), ValidationError> {
+        if self.value < self.min {
+            return Err(ValidationError {
+                property_name: self.property_name,
+                translation: TranslationKey::Validation(ValidationTranslationKey::NumberTooSmall {
+                    property_name: self.property_name,
+                    min: self.min
+                }),
+            })
+        }
+
+        Ok(())
+    }
+}
+
+struct UnsignedIntegerTooBigValidator {
+    property_name: FieldTranslationKey,
+    value: u32,
+    max: u32
+}
+
+impl<'a> Validator for UnsignedIntegerTooBigValidator {
+    fn validate(self) -> Result<(), ValidationError> {
+        if self.value > self.max {
+            return Err(ValidationError {
+                property_name: self.property_name,
+                translation: TranslationKey::Validation(ValidationTranslationKey::NumberTooBig {
+                    property_name: self.property_name,
+                    max: self.max
+                }),
+            })
+        }
 
         Ok(())
     }

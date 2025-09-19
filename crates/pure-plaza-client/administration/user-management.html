@@ -24,7 +24,6 @@
 						<h1 class="text-xl sm:text-2xl font-semibold">User management</h1>
 						<p class="text-neutral-400 text-sm">Create, update, disable/enable and delete users.</p>
 					</div>
-					<div id="new-user-btn"></div>
 				</div>
 
 				<!-- Filters toolbar -->
@@ -174,14 +173,6 @@
 			statuses: [],
 			sort: 'newest',
 		};
-
-		// Components
-		const newUserBtn = mountButton('#new-user-btn', {
-			label: 'New user',
-			variant: 'primary',
-			size: 'md',
-			onClick: () => openCreateUserModal()
-		}); // [4]
 
 		const emptyResetBtn = mountButton('#empty-reset', {
 			label: 'Reset filters',

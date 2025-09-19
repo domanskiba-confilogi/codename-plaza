@@ -139,6 +139,39 @@ impl<'a> UnitOfWork<'a> {
             .await
     }
 
+    pub async fn get_users_paginated(per_page: u32, page: u32) -> Result<PaginationResult<>, sqlx::Error> {
+        let offset = per_page * page;
+
+        let rows = sqlx::query!("
+SELECT 
+    users.id, 
+    users.ad_id, 
+    users.full_name, 
+    users.email, 
+    users.job_title_id, 
+    job_title.id as job_title_id,
+    job_title.name as job_title_name,
+    job_title.intranet_name as job_title_intranet_name,
+    job_title.parent_job_title_id as job_title_parent_job_title_id,
+    company_department.id,
+    company_department.name
+FROM users 
+INNER JOIN job_titles ON job_titles.id == users.job_title_id 
+INNER JOIN company_departments ON company_department.id == job_title.company_department_id
+OFFSET $1 LIMIT $2
+        ", per_page, page)
+            .fetch_all(&mut *self.transaction)
+            .await?;
+
+        let total = sqlx::query_scalar!("SELECT COUNT(*) FROM users;")
+            .fetch_one(&mut *self.transaction)
+            .await?;
+
+        
+
+        Ok()
+    }
+
     pub async fn get_users_by_multiple_ad_ids(
         &mut self,
         ad_ids: &[i32]
