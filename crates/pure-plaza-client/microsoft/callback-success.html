@@ -33,12 +33,12 @@
 			</div>
 		</main>
 
-		<script src="./main.js"></script>
-		<script src="./components/navbar/main.js"></script>
-		<script src="./components/text_field/main.js"></script>
-		<script src="./components/button/main.js"></script>
-		<script src="./components/modal/main.js"></script>
-		<script src="./components/suspense_screen/main.js"></script>
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
 
 		<script>
 		const authStore = createAuthStore();
@@ -53,56 +53,17 @@
 			try {
 				await checkIsGuestMiddleware(authStore);
 
-				const microsoftUri = await apiConnector.getMicrosoftSignInRedirectionUri()
-					.then(result => {
-						if (result.unknownError !== null) {
-							throw result.unknownError;
-						}
+				const urlParams = new URLSearchParams(window.location.search);
+				let accessToken = urlParams.get("access_token");
 
-						return result.ok;
-					});
-
-				loadingScreen.destroy();
-
-				const navbar = mountNavbar('#navbar-root', {
-					brandHref: '/',
-					brandName: 'Confilogi',
-					brandAccent: 'IT Support',
-					...LOGGED_OUT_NAVBAR_ARGS
-				});
-
-				const redirectNowButton = mountButton('#redirect-now-btn', {
-					label: 'Redirect now',
-					variant: 'primary',
-					size: 'md',
-					type: 'button',
-					href: microsoftUri
-				});
-
-				const emergencySignInButton = mountButton('#emergency-sign-in-btn', {
-					label: 'Emergency sign in',
-					variant: 'secondary',
-					size: 'sm',
-					type: 'button',
-					href: '/emergency-sign-in.html'
-				});
-
-				let redirectIn = 5;
-
-				const redirectionTick = () => {
-					redirectIn--;
-
-					if (redirectIn < 0) {
-						window.location.href = microsoftUri;
-					} else {
-						document.querySelector("#redirection-timer").innerHTML = redirectIn;
-					}
+				if (accessToken === null) {
+					reportCriticalError(new Error("Access token has not been sent from backend."));
+					return;
 				}
 
-				redirectionTick();
+				authStore.setLoggedInUser(accessToken, null);
 
-				setInterval(redirectionTick, 1000);
-
+				window.location.href = "/reported-problems.html";
 			} catch (error) {
 				reportCriticalError(error);
 			}

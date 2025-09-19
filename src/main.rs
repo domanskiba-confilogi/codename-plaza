@@ -6,6 +6,8 @@ use tokio::net::TcpListener;
 use crate::intranet::IntranetApi;
 use tokio_util::sync::CancellationToken;
 use tokio::sync::broadcast;
+use sqlx::Pool;
+use sqlx::Postgres;
 
 mod middlewares;
 mod uow;
@@ -13,6 +15,7 @@ mod handlers;
 mod validation;
 mod intranet;
 mod intranet_sync;
+mod ms_graph;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -33,6 +36,21 @@ struct Args {
 
     #[arg(long)]
     intranet_api_key: String,
+
+    #[arg(long)]
+    ms_tenant_id: String,
+
+    #[arg(long)]
+    ms_client_id: String,
+
+    #[arg(long)]
+    ms_client_secret: String,
+
+    #[arg(long)]
+    ms_redirection_uri: String,
+
+    #[arg(long)]
+    frontend_base_url: String,
 }
 
 #[tokio::main]
@@ -81,6 +99,10 @@ async fn main() {
         .route("/", get(handlers::get_licenses))
         .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
 
+    let microsoft_router = axum::Router::new()
+        .route("/redirection-uri", get(handlers::get_microsoft_redirection_uri))
+        .route("/callback", get(handlers::microsoft_sign_in_callback));
+
     let router = axum::Router::new()
         .nest("/auth", auth_router)
         .nest("/company-departments", company_departments_router)
@@ -88,7 +110,15 @@ async fn main() {
         .nest("/mailing-groups", mailing_groups_router)
         .nest("/system-permissions", system_permissions_router)
         .nest("/licenses", licenses_router)
-        .with_state(db_pool.clone());
+        .nest("/microsoft", microsoft_router)
+        .with_state(Arc::new(AppState {
+            db_pool: db_pool.clone(),
+            ms_client_id: args.ms_client_id.clone(),
+            ms_tenant_id: args.ms_tenant_id.clone(),
+            ms_redirection_uri: args.ms_redirection_uri.clone(),
+            ms_client_secret: args.ms_client_secret.clone(),
+            frontend_base_url: args.frontend_base_url
+        }));
 
     let intranet_api = IntranetApi::new(args.intranet_api_key);
 
@@ -106,6 +136,30 @@ async fn main() {
     let tcp_listener = TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
     axum::serve(tcp_listener, router).await.unwrap();
+}
+
+pub struct AppState {
+    db_pool: Pool<Postgres>,
+    ms_client_id: String,
+    ms_client_secret: String,
+    ms_tenant_id: String,
+    ms_redirection_uri: String,
+    frontend_base_url: String,
+}
+
+impl AppState {
+    pub fn get_unauthenticated_ms_graph_client(&self) -> ms_graph::UnauthenticatedClient {
+        ms_graph::UnauthenticatedClient::new(
+            self.ms_tenant_id.clone(),
+            self.ms_client_id.clone(),
+            self.ms_client_secret.clone(),
+            self.ms_redirection_uri.clone()
+        )
+    }
+
+    pub fn get_db_pool(&self) -> &Pool<Postgres> {
+        &self.db_pool
+    }
 }
 
 use crate::intranet_sync::Status;

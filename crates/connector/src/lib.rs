@@ -9,7 +9,7 @@ pub enum BadRequestError {
     ValidationWithTranslation(ValidationErrorWithTranslation),
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct CompanyDepartmentDto {
     pub id: i32,
     pub name: String
@@ -34,7 +34,7 @@ pub struct LicenseDto {
     pub name: String,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct JobTitleDto {
     pub id: i32,
     pub name: Option<String>,
@@ -60,6 +60,8 @@ pub struct UserDto {
     pub id: i32,
     pub email: Option<String>,
     pub full_name: String,
+    pub job_title: JobTitleDto,
+    pub company_department: Option<CompanyDepartmentDto>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]

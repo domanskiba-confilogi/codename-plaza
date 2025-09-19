@@ -182,6 +182,12 @@ impl<'a> UnitOfWork<'a> {
             .await
     }
 
+    pub async fn find_company_department_by_id(&mut self, id: i32) -> Result<Option<CompanyDepartmentEntity>, sqlx::Error> {
+        sqlx::query_as!(CompanyDepartmentEntity, "SELECT * FROM company_departments WHERE id = $1", id)
+            .fetch_optional(&mut *self.transaction)
+            .await
+    }
+
     pub async fn get_job_titles_for_company_department_id(
         &mut self,
         company_department_id: i32,
@@ -207,6 +213,12 @@ impl<'a> UnitOfWork<'a> {
 
     pub async fn get_job_title_by_intranet_name<'b>(&mut self, intranet_name: &'b str)-> Result<Option<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = $1;", intranet_name)
+            .fetch_optional(&mut *self.transaction)
+            .await
+    }
+
+    pub async fn find_job_title_by_id(&mut self, id: i32) -> Result<Option<JobTitleEntity>, sqlx::Error> {
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE id = $1;", id)
             .fetch_optional(&mut *self.transaction)
             .await
     }

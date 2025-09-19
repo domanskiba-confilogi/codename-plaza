@@ -1,0 +1,12 @@
+localhost {
+	encode zstd gzip
+	handle_path /api* {
+		rewrite /api/* /{uri}
+		reverse_proxy http://localhost:8081
+	}
+
+	handle {
+		root * ./crates/pure-plaza-client/
+		file_server
+	}
+}

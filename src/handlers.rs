@@ -2,58 +2,74 @@ use axum::{
     Json,
     Extension,
     http::StatusCode,
-    extract::State,
-    response::{Response, IntoResponse}
+    extract::{State, Query},
+    response::{Response, IntoResponse, Redirect}
 };
 use axum_macros::debug_handler;
-use sqlx::{Pool, Postgres};
 use crate::{UnitOfWork, UserEntity};
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
 use crate::validation::{LoginValidator, CreateSystemPermissionValidator};
+use serde_json::json;
+use std::sync::Arc;
+use crate::AppState;
+use url::Url;
+use anyhow::Context;
 
 #[debug_handler]
-pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginRequestBody>) -> Result<Response, Response> {
+pub async fn login(State(state): State<Arc<AppState>>, Json(json): Json<LoginRequestBody>) -> Result<Response, InternalServerError> {
     if let Err(error) = (LoginValidator {
         email: &json.email,
         password: &json.password,
     }.validate()) {
-        return Err(error.into_with_translation(Language::Polish).into_response());
+        return Ok(error.into_with_translation(Language::Polish).into_response());
     }
 
-    let mut uow = UnitOfWork::new(&pool).await.unwrap();
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
 
     let start_timestamp = Instant::now();
 
-    if let Some(user) = uow.find_user_by_email(&json.email).await.unwrap() {
+    if let Some(user) = uow.find_user_by_email(&json.email).await? {
         let request_minimum_time = rand::random::<u32>() % 300;
 
         let password_matches = match user.password {
             Some(password) => {
-                bcrypt::verify(json.password, &password).unwrap()
+                bcrypt::verify(json.password, &password)?
             }
             None => false
         };
 
         if !password_matches {
-            return Err(ValidationError {
+            return Ok(ValidationError {
                 property_name: FieldTranslationKey::Email,
                 translation: TranslationKey::Validation(ValidationTranslationKey::InvalidCredentials)
             }.into_with_translation(Language::Polish).into_response());
         }
 
-        let authorization_token = uow.create_authorization_token(user.id).await.unwrap();
+        let authorization_token = uow.create_authorization_token(user.id).await?;
 
-        let authorization_token_ids = uow.get_authorization_token_ids_by_user_id(user.id).await.unwrap();
+        let authorization_token_ids = uow.get_authorization_token_ids_by_user_id(user.id).await?;
 
         // User can have max 5 tokens
         if authorization_token_ids.len() > 5 {
             let authorization_token_ids = authorization_token_ids[..(authorization_token_ids.len() - 5)].into_iter().cloned().collect::<Vec<i32>>();
 
-            uow.delete_authorization_tokens_by_ids(&authorization_token_ids).await.unwrap();
+            uow.delete_authorization_tokens_by_ids(&authorization_token_ids).await?;
         }
 
-        uow.commit().await.unwrap();
+        let job_title = uow.find_job_title_by_id(user.job_title_id).await?
+            .context("Job title should be present, because there is a foreign key.")?;
+
+        let company_department = match job_title.company_department_id {
+            Some(company_department_id) => uow.find_company_department_by_id(company_department_id).await?
+                .map(|company_department| CompanyDepartmentDto {
+                    id: company_department.id,
+                    name: company_department.name
+                }),
+            None => None
+        };
+
+        uow.commit().await?;
 
         let wait_for_ms = (start_timestamp.elapsed().as_millis() as i64 + 300i64) - request_minimum_time as i64;
 
@@ -61,36 +77,118 @@ pub async fn login(State(pool): State<Pool<Postgres>>, Json(json): Json<LoginReq
             tokio::time::sleep(Duration::from_millis(wait_for_ms as u64)).await;
         }
 
-        return Ok((StatusCode::OK, Json(LoginResponse {
-            user: UserDto {
-                id: user.id,
-                email: user.email,
-                full_name: user.full_name
+        return Ok((StatusCode::OK, Json(UserDto {
+            id: user.id,
+            email: user.email,
+            full_name: user.full_name,
+            job_title: JobTitleDto {
+                id: job_title.id,
+                name: job_title.name,
+                intranet_name: job_title.intranet_name,
+                parent_job_title_id: job_title.parent_job_title_id,
+                company_department_id: job_title.company_department_id,
             },
-            authorization_token,
+            company_department,
         })).into_response());
     }
 
-
     uow.commit().await.unwrap();
 
-    return Err(ValidationError {
+    return Ok(ValidationError {
         property_name: FieldTranslationKey::Email,
         translation: TranslationKey::Validation(ValidationTranslationKey::InvalidCredentials)
     }.into_with_translation(Language::Polish).into_response());
 }
 
-#[debug_handler]
-pub async fn get_logged_in_user(Extension(user): Extension<UserEntity>) -> Response {
-    (StatusCode::OK, Json(UserDto {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name
-    })).into_response()
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct MicrosoftSignInCallbackQuery {
+    code: String,
 }
 
-pub async fn get_company_departments(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+#[debug_handler]
+pub async fn microsoft_sign_in_callback(State(state): State<Arc<AppState>>, Query(query): Query<MicrosoftSignInCallbackQuery>) -> Result<Response, InternalServerError> {
+    let unauthenticated_client = state.get_unauthenticated_ms_graph_client();
+
+    let access_token_response = unauthenticated_client.request_access_token(&query.code).await?;
+
+    let authenticated_client = unauthenticated_client.into_authenticated_client(access_token_response.access_token, access_token_response.refresh_token);
+
+    let employee_id = match authenticated_client.get_user_employee_id().await? {
+        Some(result) => result,
+        None => {
+            return Ok((StatusCode::BAD_REQUEST, "Your microsoft account does not seem to be inside our Active Directory system. Please contact support at support@confilogi.com to resolve the issue. ERROR: employee_id from microsoft graph is empty.").into_response());
+        }
+    };
+
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    let maybe_user = uow.find_user_by_ad_id(employee_id).await?;
+
+    match maybe_user {
+        Some(user) => {
+            let access_token = uow.create_authorization_token(user.id).await?;
+
+            uow.commit().await?;
+
+            let mut url = Url::parse(&state.frontend_base_url)?.join("/microsoft/callback-success.html")?;
+
+            url.query_pairs_mut()
+                .append_pair("access_token", &access_token);
+
+            Ok(Redirect::to(url.as_str()).into_response())
+        },
+        None => {
+            uow.commit().await?;
+
+            Ok((StatusCode::BAD_REQUEST, "User does not exist in our records. Please wait 5 minutes and try again, it might be a synchronization error.").into_response())
+        }
+    }
+}
+
+#[debug_handler]
+pub async fn get_microsoft_redirection_uri(State(state): State<Arc<AppState>>) -> Result<Response, InternalServerError> {
+    let unauthenticated_client = state.get_unauthenticated_ms_graph_client();
+
+    let login_callback_uri = unauthenticated_client.get_sign_in_redirection_uri()?;
+
+    Ok((StatusCode::OK, Json(json!({
+        "redirection_uri": login_callback_uri
+    }))).into_response())
+}
+
+#[debug_handler]
+pub async fn get_logged_in_user(State(state): State<Arc<AppState>>, Extension(user): Extension<UserEntity>) -> Result<Response, InternalServerError> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    let job_title = uow.find_job_title_by_id(user.job_title_id).await?
+        .context("Job title should be present, because there is a foreign key.")?;
+
+    let company_department = match job_title.company_department_id {
+        Some(company_department_id) => uow.find_company_department_by_id(company_department_id).await?
+            .map(|company_department| CompanyDepartmentDto {
+                id: company_department.id,
+                name: company_department.name
+            }),
+        None => None
+    };
+
+    Ok((StatusCode::OK, Json(UserDto {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        job_title: JobTitleDto {
+            id: job_title.id,
+            name: job_title.name,
+            intranet_name: job_title.intranet_name,
+            parent_job_title_id: job_title.parent_job_title_id,
+            company_department_id: job_title.company_department_id,
+        },
+        company_department
+    })).into_response())
+}
+
+pub async fn get_company_departments(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let company_departments = uow.get_company_departments().await.unwrap();
 
@@ -104,8 +202,8 @@ pub async fn get_company_departments(State(db_pool): State<Pool<Postgres>>) -> R
     }).collect::<Vec<CompanyDepartmentDto>>())).into_response())
 }
 
-pub async fn get_job_titles(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_job_titles(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let job_titles = uow.get_job_titles().await.unwrap();
 
@@ -122,8 +220,8 @@ pub async fn get_job_titles(State(db_pool): State<Pool<Postgres>>) -> Result<Res
     }).collect::<Vec<JobTitleDto>>())).into_response())
 }
 
-pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_mailing_groups(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let mailing_groups = uow.get_mailing_groups().await.unwrap().into_iter().map(|mailing_group| {
         MailingGroupDto {
@@ -138,8 +236,8 @@ pub async fn get_mailing_groups(State(db_pool): State<Pool<Postgres>>) -> Result
     Ok((StatusCode::OK, Json(mailing_groups)).into_response())
 }
 
-pub async fn get_licenses(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_licenses(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let licenses = uow.get_licenses().await.unwrap().into_iter().map(|license| {
         LicenseDto {
@@ -153,8 +251,8 @@ pub async fn get_licenses(State(db_pool): State<Pool<Postgres>>) -> Result<Respo
     Ok((StatusCode::OK, Json(licenses)).into_response())
 }
 
-pub async fn get_license_to_job_title_mappings(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_license_to_job_title_mappings(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let license_mappings = uow.get_license_to_job_title_mappings().await.unwrap().into_iter().map(|mapping| {
         LicenseToJobTitleMappingDto {
@@ -168,8 +266,8 @@ pub async fn get_license_to_job_title_mappings(State(db_pool): State<Pool<Postgr
     Ok((StatusCode::OK, Json(license_mappings)).into_response())
 }
 
-pub async fn get_system_permission_to_job_title_mappings(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_system_permission_to_job_title_mappings(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let license_mappings = uow.get_system_permissions_to_job_title_mappings().await.unwrap().into_iter().map(|mapping| {
         SystemPermissionToJobTitleMappingDto {
@@ -183,8 +281,8 @@ pub async fn get_system_permission_to_job_title_mappings(State(db_pool): State<P
     Ok((StatusCode::OK, Json(license_mappings)).into_response())
 }
 
-pub async fn get_system_permissions(State(db_pool): State<Pool<Postgres>>) -> Result<Response, Response> {
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+pub async fn get_system_permissions(State(state): State<Arc<AppState>>) -> Result<Response, Response> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let system_permission = uow.get_system_permissions().await.unwrap().into_iter().map(|system_permission| {
         SystemPermissionDto {
@@ -206,7 +304,7 @@ pub struct CreateSystemPermissionRequest {
 }
 
 pub async fn create_system_permission(
-    State(db_pool): State<Pool<Postgres>>, 
+    State(state): State<Arc<AppState>>, 
     Json(json): Json<CreateSystemPermissionRequest>
 ) -> Result<Response, Response> {
     if let Err(error) = (CreateSystemPermissionValidator {
@@ -216,7 +314,7 @@ pub async fn create_system_permission(
         return Err(error.into_with_translation(Language::Polish).into_response());
     }
     
-    let mut uow = UnitOfWork::new(&db_pool).await.unwrap();
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let system_permission_id = uow.create_system_permission(&json.name, json.subpermission_of_id).await.unwrap();
 
@@ -233,3 +331,26 @@ pub async fn create_system_permission(
     Ok((StatusCode::OK, Json(system_permission)).into_response())
 }
 
+#[derive(Debug)]
+pub struct InternalServerError(anyhow::Error);
+
+impl<E> From<E> for InternalServerError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
+}
+
+impl IntoResponse for InternalServerError {
+    fn into_response(self) -> Response {
+        eprintln!("Internal server error: {self:?}");
+
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "500 Internal Server Error",
+        )
+            .into_response()
+    }
+}

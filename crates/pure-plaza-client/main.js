@@ -164,7 +164,33 @@ function createApiConnector(config = {}) {
 			if (res.status === 200) {
 				const data = await parseJsonSafe(res);
 				if (data && typeof data === 'object' && data.id && data.email && data.full_name) {
-					return result({ ok: data });
+					let companyDepartment = null;
+					let jobTitle = {
+						id: data.job_title.id,
+						name: data.job_title.name,
+						intranet_name: data.job_title.intranet_name,
+						parent_job_title_id: data.job_title.parent_job_title_id,
+						company_department_id: data.job_title.company_department_id,
+					};
+
+					if (data.company_department !== null) {
+						companyDepartment = {
+							id: data.company_department.id,
+							name: data.company_department.name
+						}
+					}
+
+					return result({ 
+						ok: {
+							id: data.id,
+							fullName: data.full_name,
+							email: data.email,
+							jobTitleId: data.job_title_id,
+							companyDepartmentId: data.company_department_id,
+							companyDepartment,
+							jobTitle,
+						}
+					});
 				}
 				return result({
 					unknownError: new Error('Unexpected 200 response shape'),
@@ -548,7 +574,50 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings };
+	async function getMicrosoftSignInRedirectionUri() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/microsoft/redirection-uri'), {
+				method: 'GET',
+				headers: { ...defaultHeaders, },
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (typeof data === "object") {
+					return result({ ok: data.redirection_uri });
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings, getMicrosoftSignInRedirectionUri };
 }
 
 // High-resolution time when available (browser/Node)
@@ -705,6 +774,34 @@ async function checkIsLoggedInMiddleware(authStore) {
 		throw result.unknownError;
 	}
 }
+
+async function checkIsGuestMiddleware(authStore) {
+	const apiConnector = createApiConnector();
+
+	const result = await apiConnector.getLoggedInUser();
+
+	if (result.ok !== null) {
+		window.location.href = '/';
+	} else if (result.unauthorizedError !== null) {
+		authStore.setLoggedInUser(null, null);
+	} else {
+		const errorModal = mountModal("#error-modal-root", {
+			title: "A critical error occured",
+			contentHtml: `${result.unknownError}`,
+			primaryAction: { 
+				label: 'Refresh page', 
+				onClick: (_, api) => {
+					window.location.reload();
+				} 
+			},
+		});
+
+		errorModal.open();
+
+		throw result.unknownError;
+	}
+}
+
 
 function reportCriticalError(error) {
 	const errorModal = mountModal("#error-modal-root", {
