@@ -99,6 +99,10 @@ async fn main() {
         .route("/", get(handlers::get_licenses))
         .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
 
+    let users_router = axum::Router::new()
+        .route("/", get(handlers::get_paginated_users))
+        .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));
+
     let microsoft_router = axum::Router::new()
         .route("/redirection-uri", get(handlers::get_microsoft_redirection_uri))
         .route("/callback", get(handlers::microsoft_sign_in_callback));
@@ -111,6 +115,7 @@ async fn main() {
         .nest("/system-permissions", system_permissions_router)
         .nest("/licenses", licenses_router)
         .nest("/microsoft", microsoft_router)
+        .nest("/users", users_router)
         .with_state(Arc::new(AppState {
             db_pool: db_pool.clone(),
             ms_client_id: args.ms_client_id.clone(),

@@ -181,7 +181,7 @@ pub mod i18n {
         Email,
         Password,
         SystemPermissionName,
-        PaginationPage,
+        PaginationCursor,
         PaginationPerPage,
     }
 
@@ -203,9 +203,9 @@ pub mod i18n {
                         Language::Polish => format!("name"),
                     }
                 }
-                FieldTranslationKey::PaginationPage => {
+                FieldTranslationKey::PaginationCursor => {
                     match language {
-                        Language::Polish => format!("Numer porządkowy strony"),
+                        Language::Polish => format!("Kursor paginacyjny"),
                     }
                 }
                 FieldTranslationKey::PaginationPerPage => {
@@ -234,9 +234,17 @@ pub mod i18n {
         InvalidCredentials,
         NumberTooSmall {
             property_name: FieldTranslationKey,
-            min: u32,
+            min: i32,
         },
         NumberTooBig {
+            property_name: FieldTranslationKey,
+            max: i32,
+        },
+        UnsignedNumberTooSmall {
+            property_name: FieldTranslationKey,
+            min: u32,
+        },
+        UnsignedNumberTooBig {
             property_name: FieldTranslationKey,
             max: u32,
         }
@@ -263,6 +271,16 @@ pub mod i18n {
                 ValidationTranslationKey::InvalidCredentials => {
                     match language {
                         Language::Polish => format!("Email lub hasło są nieprawidłowe")
+                    }
+                }
+                ValidationTranslationKey::UnsignedNumberTooSmall { property_name, min } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" ma za małą wartość! Minimum: {min}", property_name.translate(language))
+                    }
+                }
+                ValidationTranslationKey::UnsignedNumberTooBig { property_name, max } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" ma za dużą wartość! Maximum: {max}", property_name.translate(language))
                     }
                 }
                 ValidationTranslationKey::NumberTooSmall { property_name, min } => {

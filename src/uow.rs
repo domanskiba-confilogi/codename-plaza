@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres, Transaction};
+use sqlx::{Pool, Postgres, Transaction, Row, postgres::PgRow};
 use std::fmt;
 
 pub struct UnitOfWork<'a> {
@@ -22,7 +22,7 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<bool, sqlx::Error> {
         let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE email = $1", email.into())
             .fetch_one(&mut *self.transaction)
-            .await?;
+        .await?;
 
         return Ok(count == Some(1));
     }
@@ -33,7 +33,7 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<bool, sqlx::Error> {
         let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE id = $1", user_id)
             .fetch_one(&mut *self.transaction)
-            .await?;
+        .await?;
 
         return Ok(count == Some(1));
     }
@@ -50,7 +50,7 @@ impl<'a> UnitOfWork<'a> {
             args.hashed_password,
             args.job_title_id
         )
-        .fetch_one(&mut *self.transaction)
+            .fetch_one(&mut *self.transaction)
         .await
     }
 
@@ -68,7 +68,7 @@ impl<'a> UnitOfWork<'a> {
             args.id
         )
             .execute(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -76,7 +76,7 @@ impl<'a> UnitOfWork<'a> {
     pub async fn delete_user_by_id(&mut self, id: i32) -> Result<(), sqlx::Error> {
         sqlx::query!("DELETE FROM users WHERE id = $1", id)
             .execute(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -96,7 +96,7 @@ impl<'a> UnitOfWork<'a> {
 
         sqlx::query!("INSERT INTO authorization_tokens (token, user_id) VALUES ($1, $2);", &token, user_id)
             .execute(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(token)
     }
@@ -118,7 +118,7 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<Option<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE id = $1;", user_id)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn find_user_by_email(
@@ -127,7 +127,7 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<Option<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE email = $1;", email.into())
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn find_user_by_ad_id(
@@ -136,40 +136,83 @@ impl<'a> UnitOfWork<'a> {
     ) -> Result<Option<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE ad_id = $1;", ad_id)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
-    pub async fn get_users_paginated(per_page: u32, page: u32) -> Result<PaginationResult<>, sqlx::Error> {
-        let offset = per_page * page;
+    pub async fn get_paginated_users(&mut self, per_page: u32, cursor: Option<i32>) -> Result<PaginationResult<(UserEntity, JobTitleEntity, Option<CompanyDepartmentEntity>)>, sqlx::Error> {
+        let cursor = cursor.unwrap_or(0);
 
-        let rows = sqlx::query!("
+        let rows: Vec<PgRow> = sqlx::query("
 SELECT 
-    users.id, 
-    users.ad_id, 
-    users.full_name, 
-    users.email, 
-    users.job_title_id, 
-    job_title.id as job_title_id,
-    job_title.name as job_title_name,
-    job_title.intranet_name as job_title_intranet_name,
-    job_title.parent_job_title_id as job_title_parent_job_title_id,
-    company_department.id,
-    company_department.name
-FROM users 
-INNER JOIN job_titles ON job_titles.id == users.job_title_id 
-INNER JOIN company_departments ON company_department.id == job_title.company_department_id
-OFFSET $1 LIMIT $2
-        ", per_page, page)
+    users.id as user_id, 
+    users.ad_id as user_ad_id, 
+    users.full_name as user_full_name, 
+    users.email as user_email, 
+    users.password as user_password, 
+    users.job_title_id as user_job_title_id, 
+
+    job_titles.intranet_name as job_title_intranet_name, 
+    job_titles.name as job_title_name, 
+    job_titles.parent_job_title_id as job_title_parent_job_title_id, 
+    job_titles.company_department_id as job_title_company_department_id, 
+
+    company_departments.name as company_department_name
+FROM 
+    users 
+INNER JOIN job_titles ON job_titles.id = users.job_title_id 
+LEFT JOIN company_departments ON company_departments.id = job_titles.company_department_id 
+WHERE users.id >= $1 
+LIMIT $2
+            ")
+            .bind(cursor)
+            .bind(per_page as i64)
             .fetch_all(&mut *self.transaction)
             .await?;
 
-        let total = sqlx::query_scalar!("SELECT COUNT(*) FROM users;")
+        let mut result = Vec::with_capacity(rows.len());
+
+        for row in rows.into_iter() {
+            let maybe_company_department_id: Option<i32> = row.try_get(9)?;
+
+            let company_department_entity = match maybe_company_department_id {
+                Some(id) => Some(CompanyDepartmentEntity {
+                    id: row.try_get(9)?,
+                    name: row.try_get(10)?,
+                }),
+                None => None,
+            };
+
+            result.push((
+                UserEntity {
+                    id: row.try_get(0)?,
+                    ad_id: row.try_get(1)?,
+                    full_name: row.try_get(2)?,
+                    email: row.try_get(3)?,
+                    password: row.try_get(4)?,
+                    job_title_id: row.try_get(5)?,
+                },
+                JobTitleEntity {
+                    id: row.try_get(5)?,
+                    intranet_name: row.try_get(6)?,
+                    name: row.try_get(7)?,
+                    parent_job_title_id: row.try_get(8)?,
+                    company_department_id: maybe_company_department_id,
+                },
+                company_department_entity
+            ))
+        }
+
+        let total: i64 = sqlx::query_scalar!("SELECT COUNT(*) FROM users;")
             .fetch_one(&mut *self.transaction)
-            .await?;
+            .await?
+            .unwrap_or(0);
 
-        
-
-        Ok()
+        Ok(
+            PaginationResult {
+                items: result,
+                total: total as u32,
+            }
+        )
     }
 
     pub async fn get_users_by_multiple_ad_ids(
@@ -178,7 +221,7 @@ OFFSET $1 LIMIT $2
     ) -> Result<Vec<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE ad_id = ANY($1)", ad_ids)
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn find_user_by_job_title_id(
@@ -187,13 +230,13 @@ OFFSET $1 LIMIT $2
     ) -> Result<Vec<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users WHERE job_title_id = $1;", job_title_id)
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn get_users(&mut self) -> Result<Vec<UserEntity>, sqlx::Error> {
         sqlx::query_as!(UserEntity, "SELECT * FROM users")
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn does_user_exist_by_ad_id(
@@ -202,7 +245,7 @@ OFFSET $1 LIMIT $2
     ) -> Result<bool, sqlx::Error> {
         let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM users WHERE ad_id = $1", ad_id)
             .fetch_one(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(count == Some(1))
     }
@@ -212,13 +255,13 @@ OFFSET $1 LIMIT $2
     ) -> Result<Vec<CompanyDepartmentEntity>, sqlx::Error> {
         sqlx::query_as!(CompanyDepartmentEntity, "SELECT * FROM company_departments")
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn find_company_department_by_id(&mut self, id: i32) -> Result<Option<CompanyDepartmentEntity>, sqlx::Error> {
         sqlx::query_as!(CompanyDepartmentEntity, "SELECT * FROM company_departments WHERE id = $1", id)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn get_job_titles_for_company_department_id(
@@ -227,7 +270,7 @@ OFFSET $1 LIMIT $2
     ) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE company_department_id = $1", company_department_id)
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
     // Argument intranet_names must be a &[String]. Other type will not go through the macros of
     // sqlx.
@@ -235,31 +278,31 @@ OFFSET $1 LIMIT $2
     pub async fn get_job_titles_by_multiple_intranet_names(&mut self, intranet_names: &[String]) -> Result<Option<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = ANY($1);", intranet_names)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn get_job_titles(&mut self) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles")
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn get_job_title_by_intranet_name<'b>(&mut self, intranet_name: &'b str)-> Result<Option<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE intranet_name = $1;", intranet_name)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn find_job_title_by_id(&mut self, id: i32) -> Result<Option<JobTitleEntity>, sqlx::Error> {
         sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE id = $1;", id)
             .fetch_optional(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn does_job_with_given_intranet_name_exists(&mut self, intranet_name: String) -> Result<bool, sqlx::Error> {
         let count: Option<i64> = sqlx::query_scalar!("SELECT COUNT(*) FROM job_titles WHERE intranet_name = $1", intranet_name)
             .fetch_one(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(count == Some(1))
     }
@@ -272,20 +315,20 @@ OFFSET $1 LIMIT $2
             args.company_department_id,
             args.parent_job_title_id
         )
-        .fetch_one(&mut *self.transaction)
+            .fetch_one(&mut *self.transaction)
         .await
     }
 
     pub async fn get_authorization_token_ids_by_user_id(&mut self, user_id: i32) -> Result<Vec<i32>, sqlx::Error> {
         sqlx::query_scalar!("SELECT id FROM authorization_tokens WHERE user_id = $1 ORDER BY id", user_id)
             .fetch_all(&mut *self.transaction)
-            .await
+        .await
     }
 
     pub async fn delete_authorization_tokens_by_ids(&mut self, authorization_tokens: &[i32]) -> Result<(), sqlx::Error> {
         sqlx::query!("DELETE FROM authorization_tokens WHERE id = ANY($1)", authorization_tokens)
             .execute(&mut *self.transaction)
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -321,8 +364,13 @@ OFFSET $1 LIMIT $2
             subpermission_of_id
         )
             .fetch_one(&mut *self.transaction)
-            .await
+        .await
     }
+}
+
+pub struct PaginationResult<T> {
+    pub items: Vec<T>,
+    pub total: u32,
 }
 
 #[derive(sqlx::FromRow, Clone, Debug, Default)]

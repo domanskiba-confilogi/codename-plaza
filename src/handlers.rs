@@ -9,37 +9,71 @@ use axum_macros::debug_handler;
 use crate::{UnitOfWork, UserEntity};
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
-use crate::validation::{LoginValidator, CreateSystemPermissionValidator};
+use crate::validation::{LoginValidator, CreateSystemPermissionValidator, GetPaginatedUsersValidator};
 use serde_json::json;
 use std::sync::Arc;
 use crate::AppState;
 use url::Url;
 use anyhow::Context;
 
-struct GetUsersPaginationQuery {
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct GetPaginatedUsersQuery {
+    cursor: Option<i32>,
     per_page: u32,
-    page: u32,
 }
 
-struct GetUsersPaginationResponse {
-    users: Vec<UserDto>,
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct GetPaginatedUsersResponse {
+    items: Vec<UserDto>,
     total: u32,
-    total_pages: u32,
+    next_cursor: i32
 }
 
-pub async fn get_users(State(state): State<Arc<AppState>>, Query(query): Query<GetUsersPaginationQuery>) -> Result<Response, InternalServerError> {
-    if let Err(error) = GetUsersPaginationValidator {
-        per_page: query.per_page,
-        page: query.page,
-    }.validate() {
+pub async fn get_paginated_users(State(state): State<Arc<AppState>>, Query(query): Query<GetPaginatedUsersQuery>) -> Result<Response, InternalServerError> {
+    if let Err(error) = (GetPaginatedUsersValidator {
+        cursor: query.cursor,
+        per_page: query.per_page
+    }.validate()) {
         return Ok(error.into_with_translation(Language::Polish).into_response());
     }
 
     let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
 
-    uow.get_users_paginated(query.per_page, query.page).await?;
+    let paginated_users = uow.get_paginated_users(query.per_page, query.cursor).await?;
 
     uow.commit().await?;
+
+    let next_cursor = paginated_users
+        .items
+        .iter()
+        .max_by_key(|(user, _, _)| user.id)
+        .map(|(user, _, _)| user.id).unwrap_or(0) + 1;
+
+    return Ok((StatusCode::OK, Json(GetPaginatedUsersResponse {
+        items: paginated_users.items.into_iter().map(|(user, job_title, company_department)| {
+            UserDto {
+                id: user.id,
+                full_name: user.full_name,
+                email: user.email,
+                job_title: JobTitleDto {
+                    id: job_title.id,
+                    intranet_name: job_title.intranet_name,
+                    name: job_title.name,
+                    parent_job_title_id: job_title.parent_job_title_id,
+                    company_department_id: job_title.company_department_id,
+                },
+                company_department: company_department.map(|company_department| {
+                    CompanyDepartmentDto {
+                        id: company_department.id,
+                        name: company_department.name,
+                    }
+                })
+            }
+        }).collect::<Vec<_>>(),
+
+        total: paginated_users.total,
+        next_cursor: next_cursor
+    })).into_response());
 }
 
 #[debug_handler]

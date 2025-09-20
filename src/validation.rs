@@ -115,30 +115,36 @@ impl<'a> Validator for LoginValidator<'a> {
 
 pub struct GetPaginatedUsersValidator {
     pub per_page: u32,
-    pub page: u32,
+    pub cursor: Option<i32>,
 }
 
 impl<'a> Validator for GetPaginatedUsersValidator {
     fn validate(self) -> Result<(), ValidationError> {
         UnsignedIntegerTooSmallValidator {
             property_name: FieldTranslationKey::PaginationPerPage,
+            value: self.per_page,
             min: 1
         }.validate()?;
 
         UnsignedIntegerTooBigValidator {
             property_name: FieldTranslationKey::PaginationPerPage,
+            value: self.per_page,
             max: 30,
         }.validate()?;
 
-        UnsignedIntegerTooSmallValidator {
-            property_name: FieldTranslationKey::PaginationPage,
-            min: 1
-        }.validate()?;
+        if let Some(cursor) = self.cursor {
+            IntegerTooSmallValidator {
+                property_name: FieldTranslationKey::PaginationCursor,
+                value: cursor,
+                min: 1
+            }.validate()?;
 
-        UnsignedIntegerTooBigValidator {
-            property_name: FieldTranslationKey::PaginationPage,
-            max: 999_999_999,
-        }.validate()?;
+            IntegerTooBigValidator {
+                property_name: FieldTranslationKey::PaginationCursor,
+                value: cursor,
+                max: 999_999_999,
+            }.validate()?;
+        }
 
         Ok(())
     }
@@ -179,7 +185,7 @@ impl<'a> Validator for UnsignedIntegerTooSmallValidator {
         if self.value < self.min {
             return Err(ValidationError {
                 property_name: self.property_name,
-                translation: TranslationKey::Validation(ValidationTranslationKey::NumberTooSmall {
+                translation: TranslationKey::Validation(ValidationTranslationKey::UnsignedNumberTooSmall {
                     property_name: self.property_name,
                     min: self.min
                 }),
@@ -197,6 +203,50 @@ struct UnsignedIntegerTooBigValidator {
 }
 
 impl<'a> Validator for UnsignedIntegerTooBigValidator {
+    fn validate(self) -> Result<(), ValidationError> {
+        if self.value > self.max {
+            return Err(ValidationError {
+                property_name: self.property_name,
+                translation: TranslationKey::Validation(ValidationTranslationKey::UnsignedNumberTooBig {
+                    property_name: self.property_name,
+                    max: self.max
+                }),
+            })
+        }
+
+        Ok(())
+    }
+}
+
+struct IntegerTooSmallValidator {
+    property_name: FieldTranslationKey,
+    value: i32,
+    min: i32,
+}
+
+impl<'a> Validator for IntegerTooSmallValidator {
+    fn validate(self) -> Result<(), ValidationError> {
+        if self.value < self.min {
+            return Err(ValidationError {
+                property_name: self.property_name,
+                translation: TranslationKey::Validation(ValidationTranslationKey::NumberTooSmall {
+                    property_name: self.property_name,
+                    min: self.min
+                }),
+            })
+        }
+
+        Ok(())
+    }
+}
+
+struct IntegerTooBigValidator {
+    property_name: FieldTranslationKey,
+    value: i32,
+    max: i32
+}
+
+impl<'a> Validator for IntegerTooBigValidator {
     fn validate(self) -> Result<(), ValidationError> {
         if self.value > self.max {
             return Err(ValidationError {
