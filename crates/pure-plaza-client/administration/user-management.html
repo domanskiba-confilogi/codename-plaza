@@ -11,7 +11,7 @@
 		<!-- Root for user modals -->
 		<div id="user-modal-root"></div>
 		<!-- Suspense/loader root -->
-		<div id="loader-root"></div>
+		<div id="loading-screen"></div>
 		<!-- Navbar -->
 		<div id="navbar-root"></div>
 
@@ -23,44 +23,6 @@
 					<div>
 						<h1 class="text-xl sm:text-2xl font-semibold">User management</h1>
 						<p class="text-neutral-400 text-sm">See the data of the users.</p>
-					</div>
-				</div>
-
-				<!-- Filters toolbar -->
-				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 mb-6">
-					<!-- <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"> -->
-					<!-- 	<div id="search-field"></div> -->
-					<!-- 	<div> -->
-					<!-- 		<div id="role-filter"></div> -->
-					<!-- 	</div> -->
-					<!-- 	<div> -->
-					<!-- 		<div id="status-filter"></div> -->
-					<!-- 	</div> -->
-					<!-- 	<div class="flex flex-col"> -->
-					<!-- 		<label for="sort-select" class="text-sm font-medium mb-2">Sort by</label> -->
-					<!-- 		<select id="sort-select" class="w-full rounded-md bg-neutral-950/60 text-neutral-100 placeholder-neutral-500 px-3.5 py-2.5 transition hover:bg-neutral-900/60 focus:outline-none focus:bg-neutral-950/80 ring-1 ring-inset ring-neutral-800 focus:ring-2 focus:ring-blue-400/60"> -->
-					<!-- 			<option value="newest">Newest first</option> -->
-					<!-- 			<option value="oldest">Oldest first</option> -->
-					<!-- 			<option value="name-asc">Name A–Z</option> -->
-					<!-- 			<option value="name-desc">Name Z–A</option> -->
-					<!-- 			<option value="email-asc">Email A–Z</option> -->
-					<!-- 			<option value="email-desc">Email Z–A</option> -->
-					<!-- 			<option value="role-asc">Role A–Z</option> -->
-					<!-- 			<option value="role-desc">Role Z–A</option> -->
-					<!-- 			<option value="status-asc">Status A–Z</option> -->
-					<!-- 			<option value="status-desc">Status Z–A</option> -->
-					<!-- 			<option value="lastlogin-desc">Last login (latest)</option> -->
-					<!-- 			<option value="lastlogin-asc">Last login (oldest)</option> -->
-					<!-- 		</select> -->
-					<!-- 		<div class="mt-3" id="reset-filters-btn"></div> -->
-					<!-- 	</div> -->
-					<!-- </div> -->
-
-					<!-- Legend -->
-					<div class="flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-						<span class="mr-1">Legend:</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-green-500/20 text-green-400">Active</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-red-500/20 text-red-400">Disabled</span>
 					</div>
 				</div>
 
@@ -78,7 +40,6 @@
 						<table class="min-w-full divide-y divide-neutral-800">
 							<thead class="bg-neutral-900/60">
 								<tr>
-									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">ID</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Name</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Email</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Job title</th>
@@ -90,12 +51,13 @@
 					</div>
 				</div>
 
+				<div id="table-end-sentinel" aria-hidden="true"></div>
+
 				<!-- Empty state (hidden by default) -->
 				<div id="empty-state" class="hidden mt-4">
 					<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-6 text-center">
 						<p class="text-neutral-300 mb-2">No users match your filters.</p>
-						<p class="text-neutral-500 text-sm mb-4">Try adjusting filters or reset to view all users.</p>
-						<div id="empty-reset"></div>
+						<p class="text-neutral-500 text-sm">Try adjusting filters or reset to view all users.</p>
 					</div>
 				</div>
 			</section>
@@ -110,629 +72,145 @@
 		<script src="/components/button/main.js"></script>
 		<script src="/components/suspense_screen/main.js"></script>
 		<script>
-		const navbar = mountNavbar('#navbar-root', {
-			brandHref: '/',
-			brandName: 'Confilogi',
-			brandAccent: 'IT Support',
-			...LOGGED_IN_NAVBAR_ARGS
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
 		});
 
-		function escapeHtml(str) {
-			return String(str).replace(/[&<>"']/g, s => ({
-				'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-			}[s]));
-		}
+		(async () => {
+			try {
+				const apiConnector = createApiConnector();
+				const authStore = createAuthStore();
 
-		const loader = mountSuspenseScreen('#loader-root', {
-			message: 'Working...',
-			hint: 'Please wait a moment',
-			classes: 'hidden fixed inset-0 bg-black/40 backdrop-blur-sm',
-			fullScreen: true
-		});
+				await checkIsLoggedInMiddleware(authStore);
 
-		// Enumerations
-		// const ROLE_ITEMS = [
-		// 	{ value: 'Admin',  displayText: 'Admin'  },
-		// 	{ value: 'Agent',  displayText: 'Agent'  },
-		// 	{ value: 'Viewer', displayText: 'Viewer' },
-		// ];
-		//
-		// const STATUS_ITEMS = [
-		// 	{ value: 'Active',   displayText: 'Active'   },
-		// 	{ value: 'Disabled', displayText: 'Disabled' },
-		// ];
+				let endReached = false;
+				let nextCursor = 1;
+				let total = 0;
+				let users = [];
 
-		// State
-		// const state = {
-		// 	search: '',
-		// 	roles: [],
-		// 	statuses: [],
-		// 	sort: 'newest',
-		// };
-		//
-		// const emptyResetBtn = mountButton('#empty-reset', {
-		// 	label: 'Reset filters',
-		// 	variant: 'secondary',
-		// 	size: 'sm',
-		// 	onClick: () => resetFilters(),
-		// }); // [4]
-		//
-		// const resetFiltersBtn = mountButton('#reset-filters-btn', {
-		// 	label: 'Reset filters',
-		// 	variant: 'ghost',
-		// 	size: 'sm',
-		// 	onClick: () => resetFilters(),
-		// }); // [4]
+				async function fetchUsers() {
+					let paginatedUsersResponse = await apiConnector.getPaginatedUsers(30, nextCursor);
 
-		// const searchField = mountTextField('#search-field', {
-		// 	type: 'text',
-		// 	label: 'Search users',
-		// 	placeholder: 'Search by name or email...',
-		// 	value: '',
-		// 	clearErrorOnInput: true,
-		// 	onInput: ({ new_value }) => {
-		// 		state.search = (new_value || '').trim().toLowerCase();
-		// 		render();
-		// 	},
-		// });
+					if (paginatedUsersResponse.unknownError !== null) {
+						throw paginatedUsersResponse.unknownError;
+					} else {
+						const { items, nextCursor: responseNextCursor, total: responseTotal } = paginatedUsersResponse.ok;
+						users = users.concat(items);
+						nextCursor = responseNextCursor;
+						total = responseTotal;
 
-		// const scheduleFromSelects = () => {
-		// 	// Defer to ensure SelectField internal state is updated before reading chosen [1]
-		// 	setTimeout(() => {
-		// 		state.roles = roleSelect.getChosen();
-		// 		state.statuses = statusSelect.getChosen();
-		// 		render();
-		// 	}, 0);
-		// };
-
-		// const roleSelect = mountSelectField('#role-filter', ROLE_ITEMS, {
-		// 	label: 'Roles',
-		// 	placeholder: 'Filter roles...',
-		// 	onSelect: scheduleFromSelects,
-		// }); // [1]
-		//
-		// const statusSelect = mountSelectField('#status-filter', STATUS_ITEMS, {
-		// 	label: 'Statuses',
-		// 	placeholder: 'Filter statuses...',
-		// 	onSelect: scheduleFromSelects,
-		// }); // [1]
-
-		// const sortSelect = document.querySelector('#sort-select');
-		// sortSelect.addEventListener('change', () => {
-		// 	state.sort = sortSelect.value;
-		// 	render();
-		// });
-		//
-		// function resetFilters() {
-		// 	searchField.clear({ silent: true }); // [3]
-		// 	roleSelect.clear(); // [1]
-		// 	statusSelect.clear(); // [1]
-		// 	sortSelect.value = 'newest';
-		// 	state.search = '';
-		// 	state.roles = [];
-		// 	state.statuses = [];
-		// 	state.sort = 'newest';
-		// 	render();
-		// }
-		//
-		// Rendering
-		const tbody = document.getElementById('users-tbody');
-		const summaryEl = document.getElementById('results-summary');
-		const emptyStateEl = document.getElementById('empty-state');
-		const cardsRoot = document.getElementById('users-cards-root');
-
-		function mountIfExists(selector, options) {
-			const el = document.querySelector(selector);
-			return el ? mountButton(selector, options) : null;
-		}
-
-		let rowButtons = []; // cleanup registry for per-row button instances
-
-		function statusBadgeClasses(status) {
-			return status === 'Active'
-				? 'bg-green-500/20 text-green-400'
-				: 'bg-red-500/20 text-red-400';
-		}
-
-		function applyFiltersAndSort(data) {
-			let rows = data.slice();
-			if (state.search) {
-				const q = state.search;
-				rows = rows.filter(u =>
-					u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-				);
-			}
-			if (state.roles.length > 0) {
-				const set = new Set(state.roles);
-				rows = rows.filter(u => set.has(u.role));
-			}
-			if (state.statuses.length > 0) {
-				const set = new Set(state.statuses);
-				rows = rows.filter(u => set.has(u.status));
-			}
-
-			const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
-			rows.sort((a, b) => {
-				const ca = new Date(a.createdAt), cb = new Date(b.createdAt);
-				const la = a.lastLogin ? new Date(a.lastLogin) : null;
-				const lb = b.lastLogin ? new Date(b.lastLogin) : null;
-
-				switch (state.sort) {
-					case 'newest': return cb - ca;
-					case 'oldest': return ca - cb;
-					case 'name-asc': return collator.compare(a.name, b.name);
-					case 'name-desc': return collator.compare(b.name, a.name);
-					case 'email-asc': return collator.compare(a.email, b.email);
-					case 'email-desc': return collator.compare(b.email, a.email);
-					case 'role-asc': return collator.compare(a.role, b.role);
-					case 'role-desc': return collator.compare(b.role, a.role);
-					case 'status-asc': return collator.compare(a.status, b.status);
-					case 'status-desc': return collator.compare(b.status, a.status);
-					case 'lastlogin-desc': {
-						if (la && lb) return lb - la;
-						if (la && !lb) return -1;
-						if (!la && lb) return 1;
-						return 0;
+						if (items.length === 0) endReached = true;
 					}
-					case 'lastlogin-asc': {
-						if (la && lb) return la - lb;
-						if (la && !lb) return 1;
-						if (!la && lb) return -1;
-						return 0;
-					}
-					default: return 0;
 				}
-			});
-			return rows;
-		}
 
-		function cleanupRowButtons() {
-			for (const b of rowButtons) {
-				try { b.destroy && b.destroy(); } catch {}
-			}
-			rowButtons = [];
-		}
+				await fetchUsers();
 
-		function render() {
-			const filtered = applyFiltersAndSort(USERS);
-			summaryEl.textContent = `Showing ${filtered.length} of ${USERS.length} users`;
+				loadingScreen.destroy();
 
-			cleanupRowButtons();
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
 
-			if (filtered.length === 0) {
-				tbody.innerHTML = '';
-				cardsRoot.innerHTML = '';
-				emptyStateEl.classList.remove('hidden');
-				return;
-			}
-			emptyStateEl.classList.add('hidden');
+				const tbody = document.getElementById('users-tbody');
+				const summaryEl = document.getElementById('results-summary');
+				const emptyStateEl = document.getElementById('empty-state');
+				const cardsRoot = document.getElementById('users-cards-root');
 
-			// Desktop table rows (md+)
-			const rowsHtml = filtered.map(u => {
-				const created = new Date(u.createdAt);
-				const last = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—';
-				const editId = `edit-${u.id}`;
-				const toggleId = `toggle-${u.id}`;
-				const delId = `del-${u.id}`;
-				return `
+				function statusBadgeClasses(status) {
+					return status === 'Active'
+						? 'bg-green-500/20 text-green-400'
+						: 'bg-red-500/20 text-red-400';
+				}
+
+				function render() {
+					summaryEl.textContent = `Showing ${users.length} of ${total} users`;
+
+					if (users.length === 0) {
+						tbody.innerHTML = '';
+						cardsRoot.innerHTML = '';
+						emptyStateEl.classList.remove('hidden');
+						return;
+					}
+					emptyStateEl.classList.add('hidden');
+
+					const rowsHtml = users.map(u => {
+						return `
 <tr class="hover:bg-neutral-900/40 transition">
 <td class="px-4 py-3 align-top">
 <div class="flex flex-col">
-<span class="font-semibold">${escapeHtml(u.name)}</span>
-<span class="text-xs text-neutral-400">${escapeHtml(u.id)}</span>
+<span class="font-semibold">${escapeHtml(u.fullName)}</span>
+<span class="text-xs text-neutral-400">ID: ${escapeHtml(u.id)}</span>
 </div>
 </td>
 <td class="px-4 py-3 align-top">
 <span class="text-neutral-300">${escapeHtml(u.email)}</span>
 </td>
 <td class="px-4 py-3 align-top">
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(u.role)}</span>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(u.jobTitle.name || u.jobTitle.intranetName)}</span>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(u.companyDepartment?.name || "No department")}</span>
+
 </td>
 <td class="px-4 py-3 align-top">
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.status)}">${escapeHtml(u.status)}</span>
-</td>
-<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300 hidden lg:block">
-${created.toLocaleString()}
-</td>
-<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300 hidden lg:block">
-${escapeHtml(last)}
-</td>
-<td class="px-4 py-3 align-top">
-<div class="flex items-center justify-end gap-2">
-<span id="${editId}"></span>
-<span id="${toggleId}"></span>
-<span id="${delId}"></span>
-</div>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses("Active")}">${escapeHtml("Active")}</span>
 </td>
 </tr>
 `;
-			}).join('');
-			tbody.innerHTML = rowsHtml;
+					}).join('');
+					tbody.innerHTML = rowsHtml;
 
-			// Mobile cards (sm/md)
-			const cardsHtml = filtered.map(u => {
-				const created = new Date(u.createdAt).toLocaleString();
-				const last = u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '—';
-				const editIdM = `edit-m-${u.id}`;
-				const toggleIdM = `toggle-m-${u.id}`;
-				const delIdM = `del-m-${u.id}`;
-
-				// Intentionally concise on mobile: key fields + compact meta
-				return `
+					const cardsHtml = users.map(u => {
+						return `
 <article class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 flex flex-col gap-3 hover:bg-neutral-900 transition">
 <div class="flex items-start justify-between gap-3">
 <div>
-<h2 class="text-base font-semibold leading-snug">${escapeHtml(u.name)}</h2>
+<h2 class="text-base font-semibold leading-snug">${escapeHtml(u.fullName)}</h2>
 <p class="text-sm text-neutral-400">${escapeHtml(u.email)}</p>
 </div>
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.status)}">
-${escapeHtml(u.status)}
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses("Active")}">
+${escapeHtml("Active")}
 </span>
 </div>
 <div class="flex items-center gap-2">
 <span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">
-${escapeHtml(u.role)}
+${escapeHtml(u.jobTitle?.name || u.jobTitle.intranetName)}
 </span>
 <span class="text-xs text-neutral-500">ID: ${escapeHtml(u.id)}</span>
 </div>
-<div class="text-xs text-neutral-500 flex flex-wrap gap-x-4 gap-y-1">
-<span>Created: ${escapeHtml(created)}</span>
-<span>Last login: ${escapeHtml(last)}</span>
-</div>
-<div class="mt-1 flex items-center justify-end gap-2">
-<span id="${editIdM}"></span>
-<span id="${toggleIdM}"></span>
-<span id="${delIdM}"></span>
-</div>
 </article>
 `;
-			}).join('');
-			cardsRoot.innerHTML = cardsHtml;
-
-			// Mount action buttons for both views
-			for (const u of filtered) {
-				// Desktop table
-				const editBtn = mountIfExists(`#edit-${u.id}`, {
-					label: 'Edit', variant: 'ghost', size: 'sm',
-					onClick: () => openEditUserModal(u.id),
-				});
-				const toggleBtn = mountIfExists(`#toggle-${u.id}`, {
-					label: u.status === 'Active' ? 'Disable' : 'Enable',
-					variant: u.status === 'Active' ? 'warning' : 'success', size: 'sm',
-					onClick: () => toggleUserStatus(u.id),
-				});
-				const delBtn = mountIfExists(`#del-${u.id}`, {
-					label: 'Delete', variant: 'danger', size: 'sm',
-					onClick: () => confirmDeleteUser(u.id),
-				});
-
-				// Mobile cards
-				const editBtnM = mountIfExists(`#edit-m-${u.id}`, {
-					label: 'Edit', variant: 'ghost', size: 'sm',
-					onClick: () => openEditUserModal(u.id),
-				});
-				const toggleBtnM = mountIfExists(`#toggle-m-${u.id}`, {
-					label: u.status === 'Active' ? 'Disable' : 'Enable',
-					variant: u.status === 'Active' ? 'warning' : 'success', size: 'sm',
-					onClick: () => toggleUserStatus(u.id),
-				});
-				const delBtnM = mountIfExists(`#del-m-${u.id}`, {
-					label: 'Delete', variant: 'danger', size: 'sm',
-					onClick: () => confirmDeleteUser(u.id),
-				});
-
-				for (const b of [editBtn, toggleBtn, delBtn, editBtnM, toggleBtnM, delBtnM]) {
-					if (b) rowButtons.push(b);
+					}).join('');
+					cardsRoot.innerHTML = cardsHtml;
 				}
-			}
-		}
 
-		// Actions
-		function withLoader(message, hint, fn) {
-			loader.setMessage(message || 'Working...');
-			if (hint == null) loader.setHint(null); else loader.setHint(hint);
-			loader.show();
-			return new Promise((resolve, reject) => {
-				setTimeout(async () => {
-					try {
-						const res = await fn();
-						resolve(res);
-					} catch (e) {
-						reject(e);
-					} finally {
-						loader.hide();
-					}
-				}, 500);
-			});
-		}
-
-		function openCreateUserModal() {
-			const modal = mountModal('#user-modal-root', {
-				title: 'Create user',
-				contentHtml: '',
-				size: 'md',
-				closeOnEsc: true,
-				closeOnBackdrop: true,
-				showCloseButton: true,
-			}); // [6]
-
-			const content = document.createElement('div');
-			content.className = 'flex flex-col gap-4';
-
-			content.innerHTML = `
-<div id="field-name"></div>
-<div id="field-email"></div>
-<div>
-	<div id="field-role"></div>
-	<p id="role-error" class="hidden mt-2 text-sm text-red-400"></p>
-</div>
-<div>
-	<div id="field-status"></div>
-	<p id="status-error" class="hidden mt-2 text-sm text-red-400"></p>
-</div>
-`;
-
-			modal.setContent(content); // [6]
-
-			// Fields [3][1]
-			const nameField = mountTextField('#field-name', {
-				type: 'text',
-				label: 'Full name',
-				placeholder: 'e.g. Jane Doe',
-				value: '',
-				clearErrorOnInput: true,
-			}); // [3]
-
-			const emailField = mountTextField('#field-email', {
-				type: 'text',
-				type: 'email',
-				label: 'Email',
-				placeholder: 'user@example.com',
-				value: '',
-				clearErrorOnInput: true,
-			}); // [3]
-
-			const roleField = mountSelectField('#field-role', ROLE_ITEMS, {
-				label: 'Role',
-				placeholder: 'Select role...',
-				multiple: false,
-			}); // [1]
-
-			const statusField = mountSelectField('#field-status', STATUS_ITEMS, {
-				label: 'Status',
-				placeholder: 'Select status...',
-				multiple: false,
-			}); // [1]
-			statusField.setChosen(['Active']); // default [1]
-
-			const roleErrEl = content.querySelector('#role-error');
-			const statusErrEl = content.querySelector('#status-error');
-
-			function setSelectError(el, msg) {
-				if (!el) return;
-				if (msg && msg.trim()) {
-					el.textContent = msg;
-					el.classList.remove('hidden');
-				} else {
-					el.textContent = '';
-					el.classList.add('hidden');
-				}
-			}
-
-			modal.setPrimaryAction({
-				label: 'Create',
-				onClick: async (_, api) => {
-					// Basic validation
-					let ok = true;
-					const name = nameField.getValue().trim();
-					const email = emailField.getValue().trim();
-					const role = roleField.getChosen()[0];
-					const status = statusField.getChosen()[0];
-
-					if (name.length < 2) {
-						nameField.setError('Name must be at least 2 characters'); // [3]
-						ok = false;
-					}
-					const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-					if (!emailOk) {
-						emailField.setError('Enter a valid email'); // [3]
-						ok = false;
-					}
-					setSelectError(roleErrEl, role ? '' : 'Please select a role');
-					setSelectError(statusErrEl, status ? '' : 'Please select status');
-					if (!ok || !role || !status) return;
-
-					await withLoader('Creating user...', 'Applying changes', async () => {
-						const nextId = generateUserId();
-						USERS.push({
-							id: nextId,
-							name,
-							email,
-							role,
-							status,
-							createdAt: new Date().toISOString(),
-							lastLogin: null,
-						});
-						render();
-					});
-
-					api.close(); // [6]
-					modal.destroy(); // [6]
-				}
-			});
-
-			modal.setSecondaryAction({
-				label: 'Cancel',
-				onClick: (_, api) => { api.close(); modal.destroy(); }
-			}); // [6]
-			modal.open(); // [6]
-		}
-
-		function openEditUserModal(userId) {
-			const user = USERS.find(u => u.id === userId);
-			if (!user) return;
-
-			const modal = mountModal('#user-modal-root', {
-				title: `Edit: ${escapeHtml(user.name)}`,
-				contentHtml: '',
-				size: 'md',
-				closeOnEsc: true,
-				closeOnBackdrop: true,
-				showCloseButton: true,
-			}); // [6]
-
-			const content = document.createElement('div');
-			content.className = 'flex flex-col gap-4';
-			content.innerHTML = `
-<div id="field-name"></div>
-<div id="field-email"></div>
-<div>
-	<div id="field-role"></div>
-	<p id="role-error" class="hidden mt-2 text-sm text-red-400"></p>
-</div>
-<div>
-	<div id="field-status"></div>
-	<p id="status-error" class="hidden mt-2 text-sm text-red-400"></p>
-</div>
-`;
-			modal.setContent(content); // [6]
-
-			// Fields prefilled [3][1]
-			const nameField = mountTextField('#field-name', {
-				type: 'text',
-				label: 'Full name',
-				placeholder: 'Full name',
-				value: user.name,
-				clearErrorOnInput: true,
-			}); // [3]
-
-			const emailField = mountTextField('#field-email', {
-				type: 'email',
-				label: 'Email',
-				placeholder: 'user@example.com',
-				value: user.email,
-				clearErrorOnInput: true,
-			}); // [3]
-
-			const roleField = mountSelectField('#field-role', ROLE_ITEMS, {
-				label: 'Role',
-				placeholder: 'Select role...',
-				multiple: false,
-			}); // [1]
-			roleField.setChosen([user.role]); // [1]
-
-			const statusField = mountSelectField('#field-status', STATUS_ITEMS, {
-				label: 'Status',
-				placeholder: 'Select status...',
-				multiple: false,
-			}); // [1]
-			statusField.setChosen([user.status]); // [1]
-
-			const roleErrEl = content.querySelector('#role-error');
-			const statusErrEl = content.querySelector('#status-error');
-
-			function setSelectError(el, msg) {
-				if (!el) return;
-				if (msg && msg.trim()) {
-					el.textContent = msg;
-					el.classList.remove('hidden');
-				} else {
-					el.textContent = '';
-					el.classList.add('hidden');
-				}
-			}
-
-			modal.setPrimaryAction({
-				label: 'Save changes',
-				onClick: async (_, api) => {
-					let ok = true;
-					const name = nameField.getValue().trim();
-					const email = emailField.getValue().trim();
-					const role = roleField.getChosen()[0];
-					const status = statusField.getChosen()[0];
-
-					if (name.length < 2) {
-						nameField.setError('Name must be at least 2 characters'); // [3]
-						ok = false;
-					}
-					const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-					if (!emailOk) {
-						emailField.setError('Enter a valid email'); // [3]
-						ok = false;
-					}
-					setSelectError(roleErrEl, role ? '' : 'Please select a role');
-					setSelectError(statusErrEl, status ? '' : 'Please select status');
-					if (!ok || !role || !status) return;
-
-					await withLoader('Saving user...', 'Updating records', async () => {
-						const idx = USERS.findIndex(u => u.id === userId);
-						if (idx >= 0) {
-							USERS[idx] = { ...USERS[idx], name, email, role, status };
-						}
-						render();
-					});
-
-					api.close(); // [6]
-					modal.destroy(); // [6]
-				}
-			});
-
-			modal.setSecondaryAction({
-				label: 'Cancel',
-				onClick: (_, api) => { api.close(); modal.destroy(); }
-			}); // [6]
-			modal.open(); // [6]
-		}
-
-		function toggleUserStatus(userId) {
-			const user = USERS.find(u => u.id === userId);
-			if (!user) return;
-			const next = user.status === 'Active' ? 'Disabled' : 'Active';
-			withLoader(`${next === 'Active' ? 'Enabling' : 'Disabling'} user...`, '', async () => {
-				user.status = next;
+				// Initial render
 				render();
-			});
-		}
 
-		function confirmDeleteUser(userId) {
-			const user = USERS.find(u => u.id === userId);
-			if (!user) return;
-
-			const modal = mountModal('#user-modal-root', {
-				title: 'Delete user?',
-				contentHtml: `<p class="text-neutral-300">Are you sure you want to delete <strong>${escapeHtml(user.name)}</strong> (${escapeHtml(user.email)})? This action cannot be undone.</p>`,
-				size: 'sm',
-				closeOnEsc: true,
-				closeOnBackdrop: true,
-				showCloseButton: true,
-				primaryAction: {
-					label: 'Delete',
-					onClick: async (_, api) => {
-						await withLoader('Deleting user...', '', async () => {
-							USERS = USERS.filter(u => u.id !== userId);
-							render();
-						});
-						api.close(); // [6]
-						modal.destroy(); // [6]
+				const sentinel = document.getElementById('table-end-sentinel');
+				const observer = new IntersectionObserver(async ([entry]) => {
+					if (entry.isIntersecting) {
+						try {
+							if (!endReached) {
+								await fetchUsers();
+								render();
+							}
+						} catch (error) {
+							reportCriticalError(error);
+						}
 					}
-				},
-				secondaryAction: {
-					label: 'Cancel',
-					onClick: (_, api) => { api.close(); modal.destroy(); }
-				}
-			}); // [6]
-			modal.open(); // [6]
-		}
+				}, {
+					root: null,
+					threshold: 0,
+					rootMargin: '0px 0px 150px 0px'
+				});
+				observer.observe(sentinel);
 
-		function generateUserId() {
-			// Simple incremental generator based on existing ids
-			const nums = USERS.map(u => parseInt(String(u.id).split('-')[1], 10)).filter(n => !isNaN(n));
-			const next = (nums.length ? Math.max(...nums) : 1000) + 1;
-			return `U-${next}`;
-		}
-
-		// Initial render
-		render();
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
 		</script>
 	</body>
 </html>

@@ -617,7 +617,64 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings, getMicrosoftSignInRedirectionUri };
+	async function getPaginatedUsers(per_page, cursor = 0) {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const params = new URLSearchParams();
+			params.set("per_page", per_page);
+			params.set("cursor", cursor);
+
+			const res = await fetch(toURL(`/users?${params.toString()}`), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (typeof data === "object" && data.items && data.total && data.next_cursor) {
+					return result({ 
+						ok: {
+							items: data.items.map(user => convertResponseUserDto(user)),
+							total: data.total,
+							nextCursor: data.next_cursor,
+						}
+					});
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings, getMicrosoftSignInRedirectionUri, getPaginatedUsers };
 }
 
 // High-resolution time when available (browser/Node)
@@ -818,4 +875,32 @@ function reportCriticalError(error) {
 	errorModal.open();
 	
 	throw error;
+}
+
+function convertResponseUserDto(userFromResponse) {
+	let companyDepartment = null;
+	let jobTitle = {
+		id: userFromResponse.job_title.id,
+		name: userFromResponse.job_title.name,
+		intranetName: userFromResponse.job_title.intranet_name,
+		parentJobTitleId: userFromResponse.job_title.parent_job_title_id,
+		companyDepartmentId: userFromResponse.job_title.company_department_id,
+	};
+
+	if (userFromResponse.company_department !== null) {
+		companyDepartment = {
+			id: userFromResponse.company_department.id,
+			name: userFromResponse.company_department.name
+		}
+	}
+
+	return {
+		id: userFromResponse.id,
+		fullName: userFromResponse.full_name,
+		email: userFromResponse.email,
+		jobTitleId: userFromResponse.job_title_id,
+		companyDepartmentId: userFromResponse.company_department_id,
+		companyDepartment,
+		jobTitle,
+	};
 }
