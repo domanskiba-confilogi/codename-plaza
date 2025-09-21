@@ -79,6 +79,7 @@ async fn main() {
 
     let job_titles_router = axum::Router::new()
         .route("/", get(handlers::get_job_titles))
+        .route("/paginated", get(handlers::get_paginated_job_titles))
         .route("/license-mappings", get(handlers::get_license_to_job_title_mappings))
         .route("/system-permission-mappings", get(handlers::get_system_permission_to_job_title_mappings))
         .layer(axum::middleware::from_fn_with_state(db_pool.clone(), middlewares::must_be_logged_in));

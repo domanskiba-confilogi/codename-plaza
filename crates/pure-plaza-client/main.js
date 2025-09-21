@@ -163,33 +163,9 @@ function createApiConnector(config = {}) {
 
 			if (res.status === 200) {
 				const data = await parseJsonSafe(res);
-				if (data && typeof data === 'object' && data.id && data.email && data.full_name) {
-					let companyDepartment = null;
-					let jobTitle = {
-						id: data.job_title.id,
-						name: data.job_title.name,
-						intranet_name: data.job_title.intranet_name,
-						parent_job_title_id: data.job_title.parent_job_title_id,
-						company_department_id: data.job_title.company_department_id,
-					};
-
-					if (data.company_department !== null) {
-						companyDepartment = {
-							id: data.company_department.id,
-							name: data.company_department.name
-						}
-					}
-
+				if (data && typeof data === 'object' && data.id && data.email && data.full_name && data.is_active && data.job_title) {
 					return result({ 
-						ok: {
-							id: data.id,
-							fullName: data.full_name,
-							email: data.email,
-							jobTitleId: data.job_title_id,
-							companyDepartmentId: data.company_department_id,
-							companyDepartment,
-							jobTitle,
-						}
+						ok: convertResponseUserDto(data),
 					});
 				}
 				return result({
@@ -898,6 +874,7 @@ function convertResponseUserDto(userFromResponse) {
 		id: userFromResponse.id,
 		fullName: userFromResponse.full_name,
 		email: userFromResponse.email,
+		isActive: userFromResponse.is_active,
 		jobTitleId: userFromResponse.job_title_id,
 		companyDepartmentId: userFromResponse.company_department_id,
 		companyDepartment,

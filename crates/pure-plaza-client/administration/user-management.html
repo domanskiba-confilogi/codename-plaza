@@ -154,7 +154,7 @@
 
 </td>
 <td class="px-4 py-3 align-top">
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses("Active")}">${escapeHtml("Active")}</span>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.isActive ? 'Active' : 'Disabled')}">${escapeHtml(u.isActive ? 'Active' : 'Disabled')}</span>
 </td>
 </tr>
 `;
@@ -169,8 +169,8 @@
 <h2 class="text-base font-semibold leading-snug">${escapeHtml(u.fullName)}</h2>
 <p class="text-sm text-neutral-400">${escapeHtml(u.email)}</p>
 </div>
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses("Active")}">
-${escapeHtml("Active")}
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeClasses(u.isActive ? 'Active' : 'Disabled')}">
+${escapeHtml(u.isActive ? 'Active' : 'Disabled')}
 </span>
 </div>
 <div class="flex items-center gap-2">
@@ -193,8 +193,14 @@ ${escapeHtml(u.jobTitle?.name || u.jobTitle.intranetName)}
 					if (entry.isIntersecting) {
 						try {
 							if (!endReached) {
+								const loadingScreen = mountSuspenseScreen("#loading-screen", {
+									message: "Loading next items...",
+								});
+
 								await fetchUsers();
 								render();
+
+								loadingScreen.destroy();
 							}
 						} catch (error) {
 							reportCriticalError(error);

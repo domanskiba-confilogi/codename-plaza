@@ -9,28 +9,29 @@ use axum_macros::debug_handler;
 use crate::{UnitOfWork, UserEntity};
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
-use crate::validation::{LoginValidator, CreateSystemPermissionValidator, GetPaginatedUsersValidator};
+use crate::validation::{LoginValidator, CreateSystemPermissionValidator, GetPaginatedDataWithIntegerCursorValidator};
 use serde_json::json;
 use std::sync::Arc;
 use crate::AppState;
 use url::Url;
 use anyhow::Context;
+use crate::uow::JobTitleWithDependencies;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct GetPaginatedUsersQuery {
+pub struct GetPaginatedDataWithIntegerCursorQuery {
     cursor: Option<i32>,
     per_page: u32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct GetPaginatedUsersResponse {
-    items: Vec<UserDto>,
+pub struct GetPaginatedResponse<T> {
+    items: Vec<T>,
     total: u32,
     next_cursor: i32
 }
 
-pub async fn get_paginated_users(State(state): State<Arc<AppState>>, Query(query): Query<GetPaginatedUsersQuery>) -> Result<Response, InternalServerError> {
-    if let Err(error) = (GetPaginatedUsersValidator {
+pub async fn get_paginated_users(State(state): State<Arc<AppState>>, Query(query): Query<GetPaginatedDataWithIntegerCursorQuery>) -> Result<Response, InternalServerError> {
+    if let Err(error) = (GetPaginatedDataWithIntegerCursorValidator {
         cursor: query.cursor,
         per_page: query.per_page
     }.validate()) {
@@ -49,12 +50,13 @@ pub async fn get_paginated_users(State(state): State<Arc<AppState>>, Query(query
         .max_by_key(|(user, _, _)| user.id)
         .map(|(user, _, _)| user.id).unwrap_or(0) + 1;
 
-    return Ok((StatusCode::OK, Json(GetPaginatedUsersResponse {
+    return Ok((StatusCode::OK, Json(GetPaginatedResponse {
         items: paginated_users.items.into_iter().map(|(user, job_title, company_department)| {
             UserDto {
                 id: user.id,
                 full_name: user.full_name,
                 email: user.email,
+                is_active: user.is_active,
                 job_title: JobTitleDto {
                     id: job_title.id,
                     intranet_name: job_title.intranet_name,
@@ -141,6 +143,7 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(json): Json<LoginReq
             id: user.id,
             email: user.email,
             full_name: user.full_name,
+            is_active: user.is_active,
             job_title: JobTitleDto {
                 id: job_title.id,
                 name: job_title.name,
@@ -236,6 +239,7 @@ pub async fn get_logged_in_user(State(state): State<Arc<AppState>>, Extension(us
         id: user.id,
         email: user.email,
         full_name: user.full_name,
+        is_active: user.is_active,
         job_title: JobTitleDto {
             id: job_title.id,
             name: job_title.name,
@@ -389,6 +393,61 @@ pub async fn create_system_permission(
     uow.commit().await.unwrap();
 
     Ok((StatusCode::OK, Json(system_permission)).into_response())
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct GetPaginatedJobTitlesResponse {
+    items: Vec<(JobTitleDto, CompanyDepartmentDto)>,
+    total: u32,
+    next_cursor: i32
+}
+
+#[debug_handler]
+pub async fn get_paginated_job_titles(State(state): State<Arc<AppState>>, Query(query): Query<GetPaginatedDataWithIntegerCursorQuery>) -> Result<Response, InternalServerError> {
+    if let Err(error) = (GetPaginatedDataWithIntegerCursorValidator {
+        cursor: query.cursor,
+        per_page: query.per_page
+    }.validate()) {
+        return Ok(error.into_with_translation(Language::Polish).into_response());
+    }
+
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    let paginated_result = uow.get_paginated_job_titles(query.per_page, query.cursor).await?;
+
+    uow.commit().await?;
+
+    let next_cursor = paginated_result
+        .items
+        .iter()
+        .max_by_key(|item| item.job_title.id)
+        .map(|item| item.job_title.id).unwrap_or(0) + 1;
+
+    return Ok((StatusCode::OK, Json(GetPaginatedResponse {
+        items: paginated_result.items.into_iter().map(|JobTitleWithDependencies { job_title, company_department, permissions }| {
+            (
+                JobTitleDto {
+                    id: job_title.id,
+                    intranet_name: job_title.intranet_name,
+                    name: job_title.name,
+                    parent_job_title_id: job_title.parent_job_title_id,
+                    company_department_id: job_title.company_department_id,
+                },
+                company_department.map(|company_department| {
+                    CompanyDepartmentDto {
+                        id: company_department.id,
+                        name: company_department.name,
+                    }
+                }),
+                permissions.into_iter().map(|permission| PermissionDto {
+                    id: permission.id,
+                    name: permission.name,
+                }).collect::<Vec<_>>(),
+            )
+        }).collect::<Vec<_>>(),
+        total: paginated_result.total as u32,
+        next_cursor: next_cursor
+    })).into_response());
 }
 
 #[derive(Debug)]

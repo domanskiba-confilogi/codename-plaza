@@ -113,12 +113,12 @@ impl<'a> Validator for LoginValidator<'a> {
     }
 }
 
-pub struct GetPaginatedUsersValidator {
+pub struct GetPaginatedDataWithIntegerCursorValidator {
     pub per_page: u32,
     pub cursor: Option<i32>,
 }
 
-impl<'a> Validator for GetPaginatedUsersValidator {
+impl<'a> Validator for GetPaginatedDataWithIntegerCursorValidator {
     fn validate(self) -> Result<(), ValidationError> {
         UnsignedIntegerTooSmallValidator {
             property_name: FieldTranslationKey::PaginationPerPage,
@@ -149,7 +149,6 @@ impl<'a> Validator for GetPaginatedUsersValidator {
         Ok(())
     }
 }
-
 
 pub struct CreateSystemPermissionValidator<'a> {
     pub name: &'a str,

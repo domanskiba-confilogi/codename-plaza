@@ -4,5 +4,6 @@ CREATE TABLE users (
 	full_name VARCHAR(64) NOT NULL,
 	email VARCHAR(64) DEFAULT NULL UNIQUE,
 	password VARCHAR(64) DEFAULT NULL,
+	is_active BOOLEAN NOT NULL DEFAULT FALSE,
 	job_title_id INTEGER NOT NULL REFERENCES job_titles (id)
 );

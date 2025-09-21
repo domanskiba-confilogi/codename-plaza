@@ -227,7 +227,8 @@ impl<'a> UserSynchronizationBackgroundWorker<'a> {
                 if user_entity.ad_id != Some(intranet_user.id) ||
                 user_entity.email != Some(intranet_user.email.clone()) || 
                 user_entity.full_name != intranet_user.full_name ||
-                user_entity.job_title_id != *job_title_id {
+                user_entity.job_title_id != *job_title_id ||
+                user_entity.is_active != intranet_user.is_enabled {
 
                     let args = UpdateUserArgs {
                         id: user_entity.id,
@@ -235,6 +236,7 @@ impl<'a> UserSynchronizationBackgroundWorker<'a> {
                         full_name: intranet_user.full_name.clone(),
                         email: Some(intranet_user.email.clone()),
                         hashed_password: user_entity.password.clone(),
+                        is_active: intranet_user.is_enabled,
                         job_title_id: *job_title_id
                     };
 
@@ -255,6 +257,7 @@ impl<'a> UserSynchronizationBackgroundWorker<'a> {
                     email: Some(intranet_user.email.clone()),
                     full_name: intranet_user.full_name.clone(),
                     hashed_password: None,
+                    is_active: intranet_user.is_enabled,
                     job_title_id: *job_title_id,
                 };
 

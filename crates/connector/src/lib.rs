@@ -43,6 +43,12 @@ pub struct JobTitleDto {
     pub parent_job_title_id: Option<i32>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct PermissionDto {
+    pub id: i32,
+    pub name: String,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct LicenseToJobTitleMappingDto {
     pub license_id: i32,
@@ -61,6 +67,7 @@ pub struct UserDto {
     pub email: Option<String>,
     pub full_name: String,
     pub job_title: JobTitleDto,
+    pub is_active: bool,
     pub company_department: Option<CompanyDepartmentDto>,
 }
 
