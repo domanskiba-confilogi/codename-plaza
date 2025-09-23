@@ -11,7 +11,7 @@
 		<!-- Root for modals -->
 		<div id="job-modal-root"></div>
 		<!-- Suspense/loader root -->
-		<div id="loader-root"></div>
+		<div id="loading-screen"></div>
 		<!-- Navbar -->
 		<div id="navbar-root"></div>
 
@@ -47,49 +47,9 @@
 					</div>
 				</div>
 
-				<!-- Filters toolbar -->
-				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 mb-6">
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-						<!-- Search -->
-						<div id="search-field"></div>
-						<!-- Access filter -->
-						<div>
-							<div id="access-filter"></div>
-						</div>
-						<!-- Config filter -->
-						<div>
-							<div id="config-filter"></div>
-						</div>
-						<!-- Sorting -->
-						<div class="flex flex-col">
-							<label for="sort-select" class="text-sm font-medium mb-2">Sort by</label>
-							<select id="sort-select" class="w-full rounded-md bg-neutral-950/60 text-neutral-100 placeholder-neutral-500 px-3.5 py-2.5 transition hover:bg-neutral-900/60 focus:outline-none focus:bg-neutral-950/80 ring-1 ring-inset ring-neutral-800 focus:ring-2 focus:ring-blue-400/60">
-								<option value="updated-desc">Last updated (latest)</option>
-								<option value="updated-asc">Last updated (oldest)</option>
-								<option value="name-asc">Name A–Z</option>
-								<option value="name-desc">Name Z–A</option>
-								<option value="access-desc">Access enabled first</option>
-								<option value="access-asc">Access disabled first</option>
-							</select>
-							<div class="mt-3" id="reset-filters-btn"></div>
-						</div>
-					</div>
-					<!-- Legend -->
-					<div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-						<span class="mr-1">Legend:</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-green-500/20 text-green-400">Access enabled</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-red-500/20 text-red-400">Access disabled</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-amber-500/20 text-amber-400">Unconfigured</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-sky-500/20 text-sky-300">Configured</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-purple-500/20 text-purple-300">No page permission</span>
-						<span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 ring-1 ring-neutral-800 bg-blue-500/20 text-blue-300">New sync</span>
-					</div>
-				</div>
-
 				<!-- Summary -->
 				<div class="flex items-center justify-between mb-3">
 					<p id="results-summary" class="text-sm text-neutral-400">Showing 0 job titles</p>
-					<p class="text-xs text-neutral-500">Live updates as you configure or filter</p>
 				</div>
 
 				<!-- Mobile list (cards) -->
@@ -102,16 +62,16 @@
 							<thead class="bg-neutral-900/60">
 								<tr>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Job title</th>
-									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Access</th>
+									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Company department</th>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Permissions</th>
-									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Status</th>
-									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Updated</th>
 									<th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">Actions</th>
 								</tr>
 							</thead>
 							<tbody id="jobs-tbody" class="divide-y divide-neutral-800"></tbody>
 						</table>
 					</div>
+
+					<div id="table-end" aria-hidden="true"></div>
 				</div>
 
 				<!-- Empty state -->
@@ -134,718 +94,424 @@
 		<script src="/components/modal/main.js"></script>
 		<script src="/components/button/main.js"></script>
 		<script src="/components/suspense_screen/main.js"></script>
+		<script src="/components/checkbox_field/main.js"></script>
 		<script>
-// Navbar
-const navbar = mountNavbar('#navbar-root', {
-	brandHref: '/',
-	brandName: 'Confilogi',
-	brandAccent: 'IT Support',
-	...LOGGED_IN_NAVBAR_ARGS
-});
+		const loader = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
 
-// Helper
-function escapeHtml(str) {
-	return String(str).replace(/[&<>"']/g, s => ({
-		'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-	}[s]));
-}
-
-// Suspense screen
-const loader = mountSuspenseScreen('#loader-root', {
-	message: 'Working...',
-	hint: 'Please wait a moment',
-	classes: 'hidden fixed inset-0 bg-black/40 backdrop-blur-sm',
-	fullScreen: true
-});
-function withLoader(message, hint, fn) {
-	loader.setMessage(message || 'Working...');
-	if (hint == null) loader.setHint(null); else loader.setHint(hint);
-	loader.show();
-	return new Promise((resolve, reject) => {
-		setTimeout(async () => {
+		(async () => {
 			try {
-				const res = await fn();
-				resolve(res);
-			} catch (e) {
-				reject(e);
-			} finally {
-				loader.hide();
-			}
-		}, 350);
-	});
-}
+				const apiConnector = createApiConnector();
+				const authStore = createAuthStore();
 
-// Permissions catalog
-const PERMISSION_ITEMS = [
-	{ value: 'panel:access', group: 'Core', label: 'Access IT Support Panel' },
-	{ value: 'page:jobs_manage', group: 'Pages', label: 'Job title management page' },
-	{ value: 'tickets:view', group: 'Tickets', label: 'View tickets' },
-	{ value: 'tickets:edit', group: 'Tickets', label: 'Edit tickets' },
-	{ value: 'assets:view', group: 'Assets', label: 'View assets' },
-	{ value: 'assets:edit', group: 'Assets', label: 'Edit assets' },
-	{ value: 'users:manage', group: 'Admin', label: 'Manage users' },
-	{ value: 'settings:access', group: 'Admin', label: 'Access settings' },
-];
+				await checkIsLoggedInMiddleware(authStore);
 
-// Sample job titles (simulated sync)
-let JOB_TITLES = [
-	{
-		id: 'JT-2001',
-		name: 'IT Support Agent',
-		panelAccess: true,
-		permissions: ['panel:access', 'tickets:view', 'tickets:edit'],
-		updatedAt: '2025-09-07T10:12:00Z',
-		source: 'sync',
-		isNewSync: false
-	},
-	{
-		id: 'JT-2002',
-		name: 'HR Assistant',
-		panelAccess: false,
-		permissions: [],
-		updatedAt: '2025-09-09T08:40:00Z',
-		source: 'sync',
-		isNewSync: true
-	},
-	{
-		id: 'JT-2003',
-		name: 'Finance Analyst',
-		panelAccess: false,
-		permissions: ['assets:view'],
-		updatedAt: '2025-09-05T14:05:00Z',
-		source: 'sync',
-		isNewSync: false
-	},
-	{
-		id: 'JT-2004',
-		name: 'IT Manager',
-		panelAccess: true,
-		permissions: ['panel:access', 'tickets:view', 'tickets:edit', 'users:manage', 'settings:access', 'page:jobs_manage'],
-		updatedAt: '2025-09-01T09:00:00Z',
-		source: 'sync',
-		isNewSync: false
-	},
-	{
-		id: 'JT-2005',
-		name: 'Intern',
-		panelAccess: false,
-		permissions: [],
-		updatedAt: '2025-09-10T07:55:00Z',
-		source: 'sync',
-		isNewSync: true
-	}
-];
-
-// Access + config helpers
-function isConfigured(job) {
-	return job.panelAccess || (job.permissions && job.permissions.length > 0);
-}
-function hasPagePermission(job) {
-	return new Set(job.permissions || []).has('page:jobs_manage');
-}
-function permissionLabel(value) {
-	const it = PERMISSION_ITEMS.find(p => p.value === value);
-	return it ? it.label : value;
-}
-function statusBadgeAccess(access) {
-	return access ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400';
-}
-function statusBadgeConfig(conf) {
-	return conf ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-400';
-}
-
-// State (filters/sort)
-const ACCESS_ITEMS = [
-	{ value: 'enabled', displayText: 'Access enabled' },
-	{ value: 'disabled', displayText: 'Access disabled' }
-];
-const CONFIG_ITEMS = [
-	{ value: 'configured', displayText: 'Configured' },
-	{ value: 'unconfigured', displayText: 'Unconfigured' }
-];
-const state = {
-	search: '',
-	access: [],
-	config: [],
-	sort: 'updated-desc'
-};
-
-// Components
-const bulkFixBtn = mountButton('#bulk-fix-btn', {
-	label: 'Configure all unconfigured',
-	variant: 'secondary',
-	size: 'md',
-	onClick: () => openBulkFixModal()
-});
-const refreshBtn = mountButton('#refresh-btn', {
-	label: 'Refresh',
-	variant: 'ghost',
-	size: 'md',
-	onClick: async () => {
-		await withLoader('Refreshing from backend...', '', async () => {
-			// Simulate sync that could add a new unconfigured title
-			const maybeAdd = Math.random() < 0.5;
-			if (maybeAdd) {
-				const id = genJobId();
-				JOB_TITLES.unshift({
-					id,
-					name: 'New External Title ' + id.slice(-2),
-					panelAccess: false,
+				const state = {
 					permissions: [],
-					updatedAt: new Date().toISOString(),
-					source: 'sync',
-					isNewSync: true
+					companyDepartments: [],
+					items: [],
+					total: 0,
+					perPage: 30,
+					nextCursor: 1,
+					endReached: false,
+				};
+
+				async function fetchPermissions() {
+					let { ok, unknownError } = await apiConnector.getPermissions();
+
+					if (unknownError !== null) {
+						throw unknownError;
+					} else {
+						state.permissions = ok;
+					}
+				}
+
+				async function fetchCompanyDepartments() {
+					let { ok, unknownError } = await apiConnector.getCompanyDepartments();
+
+					if (unknownError !== null) {
+						throw unknownError;
+					} else {
+						state.companyDepartments = ok;
+					}
+				}
+
+				async function fetchFromBackend() {
+					let { ok, unknownError }= await apiConnector.getJobTitlesWithDependencies();
+
+					if (unknownError !== null) {
+						throw unknownError;
+					} else {
+						state.items = ok;
+					}
+				}
+
+				await Promise.all([
+					fetchPermissions(),
+					fetchCompanyDepartments(),
+					fetchFromBackend(),
+				]);
+
+				loader.hide();
+
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
 				});
-			}
-			render();
-		});
-	}
-});
-const alertBulkFixBtn = mountButton('#alert-bulk-fix', {
-	label: 'Fix now',
-	variant: 'primary',
-	size: 'sm',
-	onClick: () => openBulkFixModal()
-});
-document.getElementById('dismiss-alert').addEventListener('click', () => {
-	const el = document.getElementById('unconfigured-alert');
-	el.classList.add('hidden');
-});
 
-const emptyResetBtn = mountButton('#empty-reset', {
-	label: 'Reset filters',
-	variant: 'secondary',
-	size: 'sm',
-	onClick: () => resetFilters()
-});
-const resetFiltersBtn = mountButton('#reset-filters-btn', {
-	label: 'Reset filters',
-	variant: 'ghost',
-	size: 'sm',
-	onClick: () => resetFilters()
-});
-const searchField = mountTextField('#search-field', {
-	type: 'text',
-	label: 'Search job titles',
-	placeholder: 'Search by job title name...',
-	value: '',
-	clearErrorOnInput: true,
-	onInput: ({ new_value }) => {
-		state.search = (new_value || '').trim().toLowerCase();
-		render();
-	},
-});
-const scheduleFromSelects = () => {
-	setTimeout(() => {
-		state.access = accessSelect.getChosen();
-		state.config = configSelect.getChosen();
-		render();
-	}, 0);
-};
-const accessSelect = mountSelectField('#access-filter', ACCESS_ITEMS, {
-	label: 'Access',
-	placeholder: 'Filter access...',
-	onSelect: scheduleFromSelects
-});
-const configSelect = mountSelectField('#config-filter', CONFIG_ITEMS, {
-	label: 'Configuration',
-	placeholder: 'Filter configuration...',
-	onSelect: scheduleFromSelects
-});
-const sortSelect = document.querySelector('#sort-select');
-sortSelect.addEventListener('change', () => {
-	state.sort = sortSelect.value;
-	render();
-});
-function resetFilters() {
-	searchField.clear({ silent: true });
-	accessSelect.clear();
-	configSelect.clear();
-	sortSelect.value = 'updated-desc';
-	state.search = '';
-	state.access = [];
-	state.config = [];
-	state.sort = 'updated-desc';
-	render();
-}
+				function withLoader(message, hint, fn) {
+					loader.setMessage(message || 'Working...');
+					if (hint == null) loader.setHint(null); else loader.setHint(hint);
+					loader.show();
+					return new Promise((resolve, reject) => {
+						setTimeout(async () => {
+							try {
+								const res = await fn();
+								resolve(res);
+							} catch (e) {
+								reject(e);
+							} finally {
+								loader.hide();
+							}
+						}, 350);
+					});
+				}
 
-// Rendering
-const tbody = document.getElementById('jobs-tbody');
-const summaryEl = document.getElementById('results-summary');
-const emptyStateEl = document.getElementById('empty-state');
-const cardsRoot = document.getElementById('jobs-cards-root');
-let rowButtons = [];
-function mountIfExists(selector, options) {
-	const el = document.querySelector(selector);
-	return el ? mountButton(selector, options) : null;
-}
-function applyFiltersAndSort(data) {
-	let rows = data.slice();
-	if (state.search) {
-		const q = state.search;
-		rows = rows.filter(j => j.name.toLowerCase().includes(q) || j.id.toLowerCase().includes(q));
-	}
-	if (state.access.length > 0) {
-		const set = new Set(state.access);
-		rows = rows.filter(j => {
-			const s = j.panelAccess ? 'enabled' : 'disabled';
-			return set.has(s);
-		});
-	}
-	if (state.config.length > 0) {
-		const set = new Set(state.config);
-		rows = rows.filter(j => {
-			const s = isConfigured(j) ? 'configured' : 'unconfigured';
-			return set.has(s);
-		});
-	}
-	const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
-	rows.sort((a, b) => {
-		const ua = new Date(a.updatedAt), ub = new Date(b.updatedAt);
-		switch (state.sort) {
-			case 'updated-desc': return ub - ua;
-			case 'updated-asc': return ua - ub;
-			case 'name-asc': return collator.compare(a.name, b.name);
-			case 'name-desc': return collator.compare(b.name, a.name);
-			case 'access-desc': return (b.panelAccess === a.panelAccess) ? collator.compare(a.name, b.name) : (b.panelAccess ? 1 : -1);
-			case 'access-asc': return (a.panelAccess === b.panelAccess) ? collator.compare(a.name, b.name) : (a.panelAccess ? 1 : -1);
-			default: return 0;
-		}
-	});
-	return rows;
-}
-function cleanupRowButtons() {
-	for (const b of rowButtons) {
-		try { b.destroy && b.destroy(); } catch {}
-	}
-	rowButtons = [];
-}
-function renderAlert() {
-	const cnt = JOB_TITLES.filter(j => !isConfigured(j) && j.isNewSync).length;
-	const el = document.getElementById('unconfigured-alert');
-	if (cnt > 0) {
-		el.querySelector('.text-amber-300').textContent = `Detected ${cnt} unconfigured job title${cnt > 1 ? 's' : ''}`;
-		el.classList.remove('hidden');
-	} else {
-		el.classList.add('hidden');
-	}
-}
-function render() {
-	const all = JOB_TITLES;
-	const filtered = applyFiltersAndSort(all);
-	summaryEl.textContent = `Showing ${filtered.length} of ${all.length} job titles`;
-	renderAlert();
-	cleanupRowButtons();
+				// Access + config helpers
+				function isConfigured(job) {
+					return job.permissionIds.length !== 0;
+				}
 
-	if (filtered.length === 0) {
-		tbody.innerHTML = '';
-		cardsRoot.innerHTML = '';
-		emptyStateEl.classList.remove('hidden');
-		return;
-	}
-	emptyStateEl.classList.add('hidden');
+				function statusBadgeConfig(conf) {
+					return conf ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-400';
+				}
 
-	// Desktop rows
-	const rowsHtml = filtered.map(j => {
-		const updated = new Date(j.updatedAt).toLocaleString();
-		const conf = isConfigured(j);
-		const pcount = j.permissions.length;
-		const configureId = `cfg-${j.id}`;
-		const toggleId = `tgl-${j.id}`;
-		const quickId = `quick-${j.id}`;
-		const tags = [];
-		if (j.isNewSync) {
-			tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-blue-500/20 text-blue-300">New sync</span>`);
-		}
-		if (!conf) {
-			tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-amber-500/20 text-amber-400">Unconfigured</span>`);
-		} else {
-			tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-sky-500/20 text-sky-300">Configured</span>`);
-		}
-		if (!hasPagePermission(j)) {
-			tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-purple-500/20 text-purple-300">No page permission</span>`);
-		}
-		return `
+				const refreshBtn = mountButton('#refresh-btn', {
+					label: 'Refresh',
+					variant: 'ghost',
+					size: 'md',
+					onClick: async () => {
+						await withLoader('Refreshing from backend...', '', async () => {
+							state.items = [];
+							state.nextCursor = 1;
+							state.total = 0;
+							state.endReached = false;
+
+							await fetchFromBackend();
+							render();
+						});
+					}
+				});
+				document.getElementById('dismiss-alert').addEventListener('click', () => {
+					const el = document.getElementById('unconfigured-alert');
+					el.classList.add('hidden');
+				});
+
+				// Rendering
+				const tbody = document.getElementById('jobs-tbody');
+				const summaryEl = document.getElementById('results-summary');
+				const emptyStateEl = document.getElementById('empty-state');
+				const cardsRoot = document.getElementById('jobs-cards-root');
+				let rowButtons = [];
+
+				function mountIfExists(selector, options) {
+					const el = document.querySelector(selector);
+					return el ? mountButton(selector, options) : null;
+				}
+
+				function permissionHumanId(permissionId) {
+					return state.permissions.find(permission => permission.id === permissionId).humanId;
+				}
+
+				function cleanupRowButtons() {
+					for (const b of rowButtons) {
+						try { b.destroy && b.destroy(); } catch {}
+					}
+					rowButtons = [];
+				}
+
+				function render() {
+					summaryEl.textContent = `Showing ${state.items.length} job titles`;
+					cleanupRowButtons();
+
+					emptyStateEl.classList.add('hidden');
+					// Desktop rows
+					const rowsHtml = state.items.map(j => {
+						const conf = isConfigured(j);
+						const pcount = j.permissionIds.length;
+						const configureId = `cfg-${j.jobTitle.id}`;
+
+						const tags = [];
+
+						if (!conf) {
+							tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-amber-500/20 text-amber-400">Unconfigured</span>`);
+						} else {
+							tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-sky-500/20 text-sky-300">Configured</span>`);
+						}
+
+						return `
 <tr class="hover:bg-neutral-900/40 transition">
 <td class="px-4 py-3 align-top">
 <div class="flex flex-col">
-<span class="font-semibold">${escapeHtml(j.name)}</span>
+<span class="font-semibold">${escapeHtml(j.jobTitle.name === null ? j.jobTitle.intranetName : j.jobTitle.name)}</span>
 <div class="mt-1 flex flex-wrap gap-1.5">${tags.join('')}</div>
-<span class="text-xs text-neutral-500 mt-1">ID: ${escapeHtml(j.id)} · Source: ${escapeHtml(j.source)}</span>
+<span class="text-xs text-neutral-500 mt-1">ID: ${escapeHtml(j.jobTitle.id)} · Intranet Name: ${escapeHtml(j.jobTitle.intranetName)}</span>
 </div>
 </td>
 <td class="px-4 py-3 align-top">
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeAccess(j.panelAccess)}">
-${j.panelAccess ? 'Enabled' : 'Disabled'}
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800">
+${escapeHtml(j.companyDepartment === null ? 'No company department' : j.companyDepartment.name)}
 </span>
 </td>
 <td class="px-4 py-3 align-top">
 ${pcount === 0
 ? '<span class="text-neutral-400 text-sm">No permissions</span>'
 : `<div class="flex flex-wrap gap-1.5">
-${j.permissions.slice(0, 4).map(p => `
-<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(permissionLabel(p))}</span>
+${j.permissionIds.slice(0, 4).map(p => `
+<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(permissionHumanId(p))}</span>
 `).join('')}
-${j.permissions.length > 4 ? `<span class="text-xs text-neutral-400">+${j.permissions.length - 4} more</span>` : ''}
+${j.permissionIds.length > 4 ? `<span class="text-xs text-neutral-400">+${j.permissionIds.length - 4} more</span>` : ''}
 </div>`
 }
-</td>
-<td class="hidden lg:table-cell px-4 py-3 align-top">
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeConfig(conf)}">
-${conf ? 'Configured' : 'Unconfigured'}
-</span>
-</td>
-<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300">
-${escapeHtml(updated)}
 </td>
 <td class="px-4 py-3 align-top">
 <div class="flex items-center justify-end gap-2">
 <span id="${configureId}"></span>
-<span id="${toggleId}"></span>
-${(!conf && !hasPagePermission(j)) ? `<span id="${quickId}"></span>` : ''}
 </div>
 </td>
 </tr>
 `;
-	}).join('');
-	tbody.innerHTML = rowsHtml;
+					}).join('');
+					tbody.innerHTML = rowsHtml;
 
-	// Mobile cards
-	const cardsHtml = filtered.map(j => {
-		const updated = new Date(j.updatedAt).toLocaleString();
-		const conf = isConfigured(j);
-		const configureId = `cfg-m-${j.id}`;
-		const toggleId = `tgl-m-${j.id}`;
-		const quickId = `quick-m-${j.id}`;
-		return `
+					state.items.forEach(({ jobTitle, companyDepartment, permissionIds }) => {
+						rowButtons.push(mountButton(`#cfg-${jobTitle.id}`, {
+							type: 'button',
+							variant: 'secondary',
+							label: 'Configure',
+							onClick: () => {
+								openEditJobTitleModal(jobTitle, companyDepartment, permissionIds)
+							},
+						}));
+					});
+
+					// Mobile cards
+					const cardsHtml = state.items.map(j => {
+						const conf = isConfigured(j);
+						const configureId = `cfg-m-${j.jobTitle.id}`;
+
+						return `
 <article class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 flex flex-col gap-3 hover:bg-neutral-900 transition">
 <div class="flex items-start justify-between gap-3">
 <div>
-<h2 class="text-base font-semibold leading-snug">${escapeHtml(j.name)}</h2>
-<p class="text-xs text-neutral-500 mt-0.5">ID: ${escapeHtml(j.id)} · Source: ${escapeHtml(j.source)}</p>
+<h2 class="text-base font-semibold leading-snug">${escapeHtml(j.jobTitle.name === null ? j.jobTitle.intranetName : j.jobTitle.name)}</h2>
+<p class="text-xs text-neutral-500 mt-0.5">ID: ${escapeHtml(j.jobTitle.id)} · Intranet Name: ${escapeHtml(j.jobTitle.intranetName)}</p>
 </div>
-<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeAccess(j.panelAccess)}">
-${j.panelAccess ? 'Access enabled' : 'Access disabled'}
-</span>
+<span class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 w-full max-w-[150px] text-ellipsis whitespace-nowrap overflow-hidden">${escapeHtml(j.companyDepartment === null ? 'No company department' : j.companyDepartment.name)}</span>
 </div>
 <div class="flex flex-wrap gap-1.5">
-${j.isNewSync ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-blue-500/20 text-blue-300">New sync</span>` : ''}
 <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 ${statusBadgeConfig(conf)}">${conf ? 'Configured' : 'Unconfigured'}</span>
-${!hasPagePermission(j) ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-purple-500/20 text-purple-300">No page permission</span>` : ''}
 </div>
-<div class="text-xs text-neutral-500">Updated: ${escapeHtml(updated)}</div>
 <div class="flex flex-wrap gap-1.5">
-${(j.permissions.length === 0)
+${(j.permissionIds.length === 0)
 ? '<span class="text-neutral-400 text-sm">No permissions</span>'
-: j.permissions.slice(0, 3).map(p => `
-<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(permissionLabel(p))}</span>
+: j.permissionIds.slice(0, 3).map(p => `
+<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">${escapeHtml(permissionHumanId(p))}</span>
 `).join('')
 }
-${j.permissions.length > 3 ? `<span class="text-xs text-neutral-400">+${j.permissions.length - 3} more</span>` : ''}
+${j.permissionIds.length > 3 ? `<span class="text-xs text-neutral-400">+${j.permissionIds.length - 3} more</span>` : ''}
 </div>
 <div class="mt-1 flex items-center justify-end gap-2">
 <span id="${configureId}"></span>
-<span id="${toggleId}"></span>
-${(!conf && !hasPagePermission(j)) ? `<span id="${quickId}"></span>` : ''}
 </div>
 </article>
 `;
-	}).join('');
-	cardsRoot.innerHTML = cardsHtml;
+					}).join('');
 
-	// Mount action buttons
-	for (const j of filtered) {
-		// Desktop
-		const cfgBtn = mountIfExists(`#cfg-${j.id}`, {
-			label: 'Configure',
-			variant: 'ghost',
-			size: 'sm',
-			onClick: () => openEditPermissionsModal(j.id)
-		});
-		const tglBtn = mountIfExists(`#tgl-${j.id}`, {
-			label: j.panelAccess ? 'Disable access' : 'Enable access',
-			variant: j.panelAccess ? 'warning' : 'success',
-			size: 'sm',
-			onClick: () => togglePanelAccess(j.id)
-		});
-		const quickBtn = mountIfExists(`#quick-${j.id}`, {
-			label: 'Grant minimal access',
-			variant: 'primary',
-			size: 'sm',
-			onClick: () => quickGrantMinimal(j.id)
-		});
-		// Mobile
-		const cfgBtnM = mountIfExists(`#cfg-m-${j.id}`, {
-			label: 'Configure',
-			variant: 'ghost',
-			size: 'sm',
-			onClick: () => openEditPermissionsModal(j.id)
-		});
-		const tglBtnM = mountIfExists(`#tgl-m-${j.id}`, {
-			label: j.panelAccess ? 'Disable access' : 'Enable access',
-			variant: j.panelAccess ? 'warning' : 'success',
-			size: 'sm',
-			onClick: () => togglePanelAccess(j.id)
-		});
-		const quickBtnM = mountIfExists(`#quick-m-${j.id}`, {
-			label: 'Grant minimal',
-			variant: 'primary',
-			size: 'sm',
-			onClick: () => quickGrantMinimal(j.id)
-		});
+					cardsRoot.innerHTML = cardsHtml;
 
-		for (const b of [cfgBtn, tglBtn, quickBtn, cfgBtnM, tglBtnM, quickBtnM]) {
-			if (b) rowButtons.push(b);
-		}
-	}
-}
+					state.items.forEach(({ jobTitle, companyDepartment, permissionIds }) => {
+						rowButtons.push(mountButton(`#cfg-m-${jobTitle.id}`, {
+							type: 'button',
+							variant: 'secondary',
+							label: 'Configure',
+							onClick: () => {
+								openEditJobTitleModal(jobTitle, companyDepartment, permissionIds)
+							},
+						}));
+					});
+				}
 
-// Actions
-function togglePanelAccess(jobId) {
-	const job = JOB_TITLES.find(j => j.id === jobId);
-	if (!job) return;
-	const next = !job.panelAccess;
-	withLoader(`${next ? 'Enabling' : 'Disabling'} access...`, '', async () => {
-		job.panelAccess = next;
-		// Keep permission in sync with selection if applicable
-		const set = new Set(job.permissions);
-		if (next) set.add('panel:access'); else set.delete('panel:access');
-		job.permissions = Array.from(set);
-		job.updatedAt = new Date().toISOString();
-		job.isNewSync = false;
-		render();
-	});
-}
-function quickGrantMinimal(jobId) {
-	const job = JOB_TITLES.find(j => j.id === jobId);
-	if (!job) return;
-	withLoader('Granting minimal access...', 'Panel access + view tickets', async () => {
-		const set = new Set(job.permissions);
-		set.add('panel:access');
-		set.add('tickets:view');
-		// Note: we do NOT auto-grant page:jobs_manage (admin-only)
-		job.permissions = Array.from(set);
-		job.panelAccess = true;
-		job.updatedAt = new Date().toISOString();
-		job.isNewSync = false;
-		render();
-	});
-}
-function openBulkFixModal() {
-	const unconfigured = JOB_TITLES.filter(j => !isConfigured(j));
-	if (unconfigured.length === 0) return;
-	const modal = mountModal('#job-modal-root', {
-		title: 'Configure unconfigured job titles',
-		contentHtml: '',
-		size: 'md',
-		closeOnEsc: true,
-		closeOnBackdrop: true,
-		showCloseButton: true
-	});
-	const content = document.createElement('div');
-	content.className = 'flex flex-col gap-4';
-	content.innerHTML = `
-<p class="text-neutral-300">This will grant minimal access to the following ${unconfigured.length} job title${unconfigured.length > 1 ? 's' : ''}:</p>
-<ul class="list-disc list-inside text-neutral-400 text-sm max-h-40 overflow-auto pr-2">
-	${unconfigured.map(j => `<li>${escapeHtml(j.name)} <span class="text-neutral-600">(ID: ${escapeHtml(j.id)})</span></li>`).join('')}
-</ul>
+				function openEditJobTitleModal(jobTitle, companyDepartment, permissionIds) {
+					const modal = mountModal('#job-modal-root', {
+						title: `Configure: ${escapeHtml(jobTitle.name === null ? jobTitle.intranetName : jobTitle.name)}`,
+						contentHtml: '',
+						size: 'lg',
+						closeOnEsc: true,
+						closeOnBackdrop: true,
+						showCloseButton: true
+					});
+
+					const content = document.createElement('div');
+					content.className = 'flex flex-col gap-5';
+
+					content.innerHTML += `
+<div id="job-title-intranet-name-root"></div>
+<div id="job-title-name-root"></div>
+<div id="job-title-parent-job-title-root"></div>
+<div id="job-title-company-department-root"></div>
+`;
+
+					// Permissions by API
+					const authPermissions = state.permissions.filter(permission => permission.humanId.startsWith("auth:"));
+					const userManagementPermissions = state.permissions.filter(permission => permission.humanId.startsWith("users:"));
+					const ticketCreationPermissions = state.permissions.filter(permission => permission.humanId.startsWith("create-ticket:"));
+					const ticketManagementPermissions = state.permissions.filter(permission => permission.humanId.startsWith("ticket:"));
+					const companyDepartmentsPermissions = state.permissions.filter(permission => permission.humanId.startsWith("company-departments:"));
+					const jobTitlesPermissions = state.permissions.filter(permission => permission.humanId.startsWith("job-titles:"));
+					const synchronizationPermissions = state.permissions.filter(permission => permission.humanId.startsWith("synchronization:"));
+					const otherPermissions = state.permissions.filter(permission => 
+						!(authPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						userManagementPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						ticketCreationPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						ticketManagementPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						synchronizationPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						jobTitlesPermissions.findIndex(sp => sp.id === permission.id) !== -1 ||
+						companyDepartmentsPermissions.findIndex(sp => sp.id === permission.id) !== -1)
+					);
+
+					const generatePermissionsHtmlSection = (name, permissions) => `
 <div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-xl p-3">
-	<p class="text-sm text-neutral-300 mb-1">Changes to apply:</p>
-	<ul class="text-sm text-neutral-400 list-disc list-inside">
-		<li>Enable panel access</li>
-		<li>Add "View tickets" permission</li>
-	</ul>
-	<p class="text-xs text-neutral-500 mt-2">Note: "Job title management page" permission remains admin-only and is not granted automatically.</p>
+	<div class="flex items-center justify-between mb-2">
+		<h3 class="text-sm font-medium text-neutral-200">${escapeHtml(name)}</h3>
+	</div>
+	<div class="flex flex-col gap-2">
+		${permissions.map(p => `<div id="permission-${p.id}"></div>`).join('')}
+	</div>
 </div>
 `;
-	modal.setContent(content);
-	modal.setPrimaryAction({
-		label: 'Apply changes',
-		onClick: async (_, api) => {
-			await withLoader('Applying minimal access...', '', async () => {
-				for (const j of unconfigured) {
-					const set = new Set(j.permissions);
-					set.add('panel:access');
-					set.add('tickets:view');
-					j.permissions = Array.from(set);
-					j.panelAccess = true;
-					j.updatedAt = new Date().toISOString();
-					j.isNewSync = false;
-				}
-				render();
-			});
-			api.close(); modal.destroy();
-		}
-	});
-	modal.setSecondaryAction({
-		label: 'Cancel',
-		onClick: (_, api) => { api.close(); modal.destroy(); }
-	});
-	modal.open();
-}
-function openEditPermissionsModal(jobId) {
-	const job = JOB_TITLES.find(j => j.id === jobId);
-	if (!job) return;
-	const modal = mountModal('#job-modal-root', {
-		title: `Configure: ${escapeHtml(job.name)}`,
-		contentHtml: '',
-		size: 'lg',
-		closeOnEsc: true,
-		closeOnBackdrop: true,
-		showCloseButton: true
-	});
 
-	// Build permission groups
-	const groups = Array.from(new Set(PERMISSION_ITEMS.map(p => p.group)));
-	const selected = new Set(job.permissions);
-	const content = document.createElement('div');
-	content.className = 'flex flex-col gap-5';
-	content.innerHTML = `
-<div class="flex flex-wrap items-center justify-between gap-3">
-	<div class="flex items-center gap-2">
-		<span class="text-sm text-neutral-400">Panel access:</span>
-		<span id="panel-access-pill" class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ${statusBadgeAccess(job.panelAccess)}">
-			${job.panelAccess ? 'Enabled' : 'Disabled'}
-		</span>
-	</div>
-	<div id="toggle-panel-access"></div>
-</div>
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-	${groups.map(g => `
-	<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-xl p-3">
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-sm font-medium text-neutral-200">${escapeHtml(g)}</h3>
-			<button data-group="${escapeHtml(g)}" class="text-xs text-blue-300 hover:text-blue-200 underline underline-offset-2 group-select-all">Select all</button>
-		</div>
-		<div class="flex flex-col gap-2">
-			${PERMISSION_ITEMS.filter(p => p.group === g).map(p => `
-			<label class="flex items-start gap-2 cursor-pointer">
-				<input type="checkbox" data-perm="${escapeHtml(p.value)}" class="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-blue-400 focus:ring-blue-400/50" ${selected.has(p.value) ? 'checked' : ''}>
-				<span class="text-sm text-neutral-300">${escapeHtml(p.label)} <span class="text-[11px] text-neutral-500">(${escapeHtml(p.value)})</span></span>
-			</label>
-			`).join('')}
-		</div>
-	</div>
-	`).join('')}
-</div>
-<div id="page-access-hint" class="${hasPagePermission(job) ? 'hidden' : ''} bg-purple-900/20 ring-1 ring-purple-700/40 rounded-xl p-3">
-	<p class="text-sm text-purple-200">This job title cannot access the Job title management page. Grant "Job title management page" permission if needed for administrators.</p>
-</div>
+					content.innerHTML += `
+${generatePermissionsHtmlSection("Authentication", authPermissions)}
+${generatePermissionsHtmlSection("User management", userManagementPermissions)}
+${generatePermissionsHtmlSection("Create ticket", ticketCreationPermissions)}
+${generatePermissionsHtmlSection("Tickets", ticketManagementPermissions)}
+${generatePermissionsHtmlSection("Synchronization", synchronizationPermissions)}
+${generatePermissionsHtmlSection("Company departments", companyDepartmentsPermissions)}
+${generatePermissionsHtmlSection("Job titles", jobTitlesPermissions)}
+${generatePermissionsHtmlSection("Other", otherPermissions)}
 `;
-	modal.setContent(content);
 
-	// Panel access toggle button
-	const panelToggle = mountButton('#toggle-panel-access', {
-		label: job.panelAccess ? 'Disable access' : 'Enable access',
-		variant: job.panelAccess ? 'warning' : 'success',
-		size: 'sm',
-		onClick: () => {
-			// Toggle visual and selected set immediately
-			const next = !selected.has('panel:access');
-			if (next) selected.add('panel:access'); else selected.delete('panel:access');
-			const pill = content.querySelector('#panel-access-pill');
-			if (pill) {
-				pill.className = 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ' + (next ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
-				pill.textContent = next ? 'Enabled' : 'Disabled';
-			}
-			panelToggle.setLabel(next ? 'Disable access' : 'Enable access');
-			// Reflect on checkbox if exists in list
-			const chk = content.querySelector('input[type=checkbox][data-perm="panel:access"]');
-			if (chk) chk.checked = next;
-		}
-	});
-	rowButtons.push(panelToggle);
+					modal.setContent(content);
 
-	// Wire checkboxes
-	content.querySelectorAll('input[type=checkbox][data-perm]').forEach(chk => {
-		chk.addEventListener('change', () => {
-			const perm = chk.getAttribute('data-perm');
-			if (chk.checked) selected.add(perm); else selected.delete(perm);
-			// Keep panel pill in sync
-			if (perm === 'panel:access') {
-				const pill = content.querySelector('#panel-access-pill');
-				const enabled = selected.has('panel:access');
-				if (pill) {
-					pill.className = 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ' + (enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
-					pill.textContent = enabled ? 'Enabled' : 'Disabled';
-				}
-				panelToggle.setLabel(enabled ? 'Disable access' : 'Enable access');
-			}
-			// Page access hint
-			const hint = content.querySelector('#page-access-hint');
-			if (hint) {
-				if (selected.has('page:jobs_manage')) hint.classList.add('hidden'); else hint.classList.remove('hidden');
-			}
-		});
-	});
+					mountTextField(`#job-title-intranet-name-root`, {
+						type: 'text',
+						label: "Intranet name",
+						value: jobTitle.intranetName,
+						disabled: true
+					});
 
-	// Group "Select all"
-	content.querySelectorAll('.group-select-all').forEach(btn => {
-		btn.addEventListener('click', (e) => {
-			e.preventDefault();
-			const group = btn.getAttribute('data-group');
-			const boxes = content.querySelectorAll(`input[type=checkbox][data-perm]`);
-			boxes.forEach(chk => {
-				const perm = chk.getAttribute('data-perm');
-				const item = PERMISSION_ITEMS.find(p => p.value === perm);
-				if (item && item.group === group) {
-					chk.checked = true;
-					selected.add(perm);
-				}
-			});
-			// Sync panel pill if needed
-			if (group === 'Core') {
-				const enabled = selected.has('panel:access');
-				const pill = content.querySelector('#panel-access-pill');
-				if (pill) {
-					pill.className = 'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md ring-1 ring-neutral-800 ' + (enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
-					pill.textContent = enabled ? 'Enabled' : 'Disabled';
-				}
-				panelToggle.setLabel(enabled ? 'Disable access' : 'Enable access');
-			}
-			const hint = content.querySelector('#page-access-hint');
-			if (hint) {
-				if (selected.has('page:jobs_manage')) hint.classList.add('hidden'); else hint.classList.remove('hidden');
-			}
-		});
-	});
-
-	modal.setPrimaryAction({
-		label: 'Save changes',
-		onClick: async (_, api) => {
-			await withLoader('Saving permissions...', 'Updating job title', async () => {
-				const idx = JOB_TITLES.findIndex(j => j.id === jobId);
-				if (idx >= 0) {
-					const newPerms = Array.from(selected);
-					JOB_TITLES[idx] = {
-						...JOB_TITLES[idx],
-						permissions: newPerms,
-						panelAccess: selected.has('panel:access'),
-						updatedAt: new Date().toISOString(),
-						isNewSync: false
+					const fields = {
+						name: mountTextField(`#job-title-name-root`, {
+							type: 'text',
+							label: "English name",
+							value: jobTitle.name,
+						}),
+						parentJobTitleId: mountSelectField(
+							`#job-title-parent-job-title-root`, 
+							state.items.slice().filter(row => row.jobTitle.id !== jobTitle.id)
+								.map(row => ({ 
+									displayText: row.jobTitle.intranetName === null ? 
+										row.jobTitle.name : 
+										row.jobTitle.intranetName,
+									value: row.jobTitle.id,
+								})),
+							{
+								label: "Parent",
+								multiple: false,
+							}
+						),
+						companyDepartmentId: mountSelectField(
+							`#job-title-company-department-root`, 
+							state.companyDepartments.map(row => ({ displayText: row.name, value: row.id })), 
+							{
+								label: "Company department",
+								multiple: false,
+							}
+						),
+						permissionIds: {}
 					};
+
+					if (jobTitle.parentJobTitleId !== null) {
+						fields.parentJobTitleId.setChosen([jobTitle.parentJobTitleId]);
+					}
+
+					if (jobTitle.companyDepartmentId !== null) {
+						fields.companyDepartmentId.setChosen([jobTitle.companyDepartmentId]);
+					}
+
+					state.permissions.forEach(permission => {
+						fields.permissionIds[permission.id] = mountCheckbox(`#permission-${permission.id}`, {
+							description: permission.humanId,
+							label: permission.description,
+							checked: permissionIds.includes(permission.id),
+						});
+					});
+
+					modal.setPrimaryAction({
+						label: 'Save changes',
+						onClick: async (_, api) => {
+							fields.name.disable();
+							fields.parentJobTitleId.disable();
+							fields.companyDepartmentId.disable();
+							Object.values(fields.permissionIds).forEach(val => val.disable());
+							api.setLoading(true);
+
+							const enabledPermissionIds = [];
+
+							Object.keys(fields.permissionIds).forEach(permissionId => {
+								if (fields.permissionIds[parseInt(permissionId)].getValue()) {
+									enabledPermissionIds.push(parseInt(permissionId));
+								}
+							});
+
+							await withLoader('Saving permissions...', 'Updating job title', async () => {
+								await apiConnector.updateJobTitle(
+									jobTitle.id, 
+									fields.name.getValue(), 
+									fields.parentJobTitleId.getChosen().length > 0 ? 
+										fields.parentJobTitleId.getChosen()[0] : null, 
+									fields.companyDepartmentId.getChosen().length > 0 ? 
+										fields.companyDepartmentId.getChosen()[0] : null, 
+									enabledPermissionIds
+								);
+								await fetchFromBackend();
+								render();
+							});
+							api.close(); 
+							modal.destroy();
+						}
+					});
+
+					modal.setSecondaryAction({
+						label: 'Cancel',
+						onClick: (_, api) => { api.close(); modal.destroy(); }
+					});
+
+					modal.open();
 				}
+
+				// Initial render
 				render();
-			});
-			api.close(); modal.destroy();
-		}
-	});
-	modal.setSecondaryAction({
-		label: 'Cancel',
-		onClick: (_, api) => { api.close(); modal.destroy(); }
-	});
-	modal.open();
-}
 
-// Generators
-function genJobId() {
-	const nums = JOB_TITLES.map(j => parseInt(String(j.id).split('-')[1], 10)).filter(n => !isNaN(n));
-	const next = (nums.length ? Math.max(...nums) : 2000) + 1;
-	return `JT-${next}`;
-}
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
 
-// Initial render
-render();
 		</script>
 	</body>
 </html>

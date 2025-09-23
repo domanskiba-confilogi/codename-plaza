@@ -16,6 +16,14 @@ impl<'a> UnitOfWork<'a> {
         self.transaction.commit().await
     }
 
+    pub async fn get_all_permissions(
+        &mut self,
+    ) -> Result<Vec<PermissionEntity>, sqlx::Error> {
+        sqlx::query_as!(PermissionEntity, "SELECT * FROM permissions")
+            .fetch_all(&mut *self.transaction)
+        .await
+    }
+
     pub async fn does_user_with_given_email_exists(
         &mut self,
         email: impl Into<String>,
@@ -146,31 +154,31 @@ impl<'a> UnitOfWork<'a> {
 
         let rows: Vec<PgRow> = sqlx::query("
 SELECT 
-    users.id as user_id, 
-    users.ad_id as user_ad_id, 
-    users.full_name as user_full_name, 
-    users.email as user_email, 
-    users.password as user_password, 
-    users.is_active as user_is_active,
-    users.job_title_id as user_job_title_id, 
+users.id as user_id, 
+users.ad_id as user_ad_id, 
+users.full_name as user_full_name, 
+users.email as user_email, 
+users.password as user_password, 
+users.is_active as user_is_active,
+users.job_title_id as user_job_title_id, 
 
-    job_titles.intranet_name as job_title_intranet_name, 
-    job_titles.name as job_title_name, 
-    job_titles.parent_job_title_id as job_title_parent_job_title_id, 
-    job_titles.company_department_id as job_title_company_department_id, 
+job_titles.intranet_name as job_title_intranet_name, 
+job_titles.name as job_title_name, 
+job_titles.parent_job_title_id as job_title_parent_job_title_id, 
+job_titles.company_department_id as job_title_company_department_id, 
 
-    company_departments.name as company_department_name
+company_departments.name as company_department_name
 FROM 
-    users 
+users 
 INNER JOIN job_titles ON job_titles.id = users.job_title_id 
 LEFT JOIN company_departments ON company_departments.id = job_titles.company_department_id 
 WHERE users.id >= $1 
 LIMIT $2
-            ")
+")
             .bind(cursor)
             .bind(per_page as i64)
             .fetch_all(&mut *self.transaction)
-            .await?;
+        .await?;
 
         let mut result = Vec::with_capacity(rows.len());
 
@@ -273,36 +281,29 @@ LIMIT $2
 
         let rows: Vec<PgRow> = sqlx::query("
 SELECT
-	jt.id,
-	jt.intranet_name,
-	jt.name,
-	jt.parent_job_title_id,
-	jt.company_department_id,
-        cd.name as company_department_name,
-	ARRAY(
-		SELECT p.id 
-		FROM job_titles_have_permissions jtp 
-		JOIN permissions p ON p.id = jtp.permission_id 
-		WHERE jtp.job_title_id = jt.id 
-		ORDER BY p.id
-	) AS permission_ids,
-	ARRAY(
-		SELECT p.name
-		FROM job_titles_have_permissions jtp 
-		JOIN permissions p ON p.id = jtp.permission_id 
-		WHERE jtp.job_title_id = jt.id 
-		ORDER BY p.id
-	) AS permission_names
+jt.id,
+jt.intranet_name,
+jt.name,
+jt.parent_job_title_id,
+jt.company_department_id,
+cd.name as company_department_name,
+ARRAY(
+SELECT p.id 
+FROM job_titles_have_permissions jtp 
+JOIN permissions p ON p.id = jtp.permission_id 
+WHERE jtp.job_title_id = jt.id 
+ORDER BY p.id
+) AS permission_ids
 FROM job_titles jt 
 LEFT JOIN company_departments cd ON cd.id = jt.company_department_id 
 WHERE jt.id >= $1 
 ORDER BY jt.id ASC 
 LIMIT $2;
-            ")
+")
             .bind(cursor)
             .bind(per_page as i64)
             .fetch_all(&mut *self.transaction)
-            .await?;
+        .await?;
 
         let mut result = Vec::with_capacity(rows.len());
 
@@ -318,16 +319,6 @@ LIMIT $2;
             };
 
             let permission_ids: Vec<i32> = row.try_get(6)?;
-            let permission_names: Vec<String> = row.try_get(7)?;
-
-            let mut permissions = Vec::with_capacity(permission_ids.len());
-
-            for (index, permission_name) in permission_names.into_iter().enumerate() {
-                permissions.push(PermissionEntity {
-                    id: *permission_ids.get(index).expect("permission_names to be the same length as permission_ids"),
-                    name: permission_name
-                });
-            }
 
             result.push(
                 JobTitleWithDependencies {
@@ -339,7 +330,7 @@ LIMIT $2;
                         company_department_id: maybe_company_department_id,
                     },
                     company_department: company_department_entity,
-                    permissions,
+                    permission_ids,
                 }
             );
         }
@@ -353,6 +344,61 @@ LIMIT $2;
             items: result,
             total: total as u32,
         })
+    }
+
+    pub async fn get_job_titles_with_dependencies(&mut self) -> Result<Vec<JobTitleWithDependencies>, sqlx::Error> {
+        let rows: Vec<PgRow> = sqlx::query("
+SELECT
+jt.id,
+jt.intranet_name,
+jt.name,
+jt.parent_job_title_id,
+jt.company_department_id,
+cd.name as company_department_name,
+ARRAY(
+SELECT p.id 
+FROM job_titles_have_permissions jtp 
+JOIN permissions p ON p.id = jtp.permission_id 
+WHERE jtp.job_title_id = jt.id 
+ORDER BY p.id
+) AS permission_ids
+FROM job_titles jt 
+LEFT JOIN company_departments cd ON cd.id = jt.company_department_id;
+")
+            .fetch_all(&mut *self.transaction)
+        .await?;
+
+        let mut result = Vec::with_capacity(rows.len());
+
+        for row in rows.into_iter() {
+            let maybe_company_department_id: Option<i32> = row.try_get(4)?;
+
+            let company_department_entity = match maybe_company_department_id {
+                Some(id) => Some(CompanyDepartmentEntity {
+                    id,
+                    name: row.try_get(5)?,
+                }),
+                None => None,
+            };
+
+            let permission_ids: Vec<i32> = row.try_get(6)?;
+
+            result.push(
+                JobTitleWithDependencies {
+                    job_title: JobTitleEntity {
+                        id: row.try_get(0)?,
+                        intranet_name: row.try_get(1)?,
+                        name: row.try_get(2)?,
+                        parent_job_title_id: row.try_get(3)?,
+                        company_department_id: maybe_company_department_id,
+                    },
+                    company_department: company_department_entity,
+                    permission_ids,
+                }
+            );
+        }
+
+        Ok(result)
     }
 
     pub async fn get_job_titles_for_company_department_id(
@@ -448,6 +494,51 @@ LIMIT $2;
         sqlx::query_as!(SystemPermissionToJobTitleMappingEntity, "SELECT * FROM job_titles_have_strict_onboarding_system_permissions_mappings").fetch_all(&mut *self.transaction).await
     }
 
+    pub async fn check_if_all_permission_ids_exist(&mut self, permission_ids: Vec<i32>) -> Result<bool, sqlx::Error> {
+        let result: Vec<i32> = sqlx::query_scalar!("SELECT id FROM permissions WHERE id = ANY($1)", &permission_ids[..])
+            .fetch_all(&mut *self.transaction)
+        .await?;
+
+        return Ok(result.len() == permission_ids.len())
+    }
+
+    pub async fn change_job_title_permissions(&mut self, job_title_id: i32, permission_ids: Vec<i32>) -> Result<(), sqlx::Error> {
+        sqlx::query!("DELETE FROM job_titles_have_permissions WHERE job_title_id = $1;", job_title_id).execute(&mut *self.transaction).await?;
+
+        if permission_ids.len() == 0 {
+            return Ok(());
+        }
+
+        let mut sql = "INSERT INTO job_titles_have_permissions (job_title_id, permission_id) VALUES ".to_string();
+
+        let permission_count = permission_ids.len();
+
+        let mut parameter_count = 1;
+
+        for (index, permission_id) in permission_ids.iter().enumerate() {
+            sql.push_str(&format!("(${}, ${})", parameter_count, parameter_count + 1));
+
+            parameter_count += 2;
+
+            if index + 1 != permission_count {
+                sql.push(',');
+            }
+        }
+
+        println!("{sql}");
+
+        let mut query = sqlx::query(&sql);
+
+        for permission_id in permission_ids.into_iter() {
+            query = query.bind(job_title_id)
+                .bind(permission_id);
+        }
+
+        query.execute(&mut *self.transaction).await?;
+
+        Ok(())
+    }
+
     pub async fn create_system_permission(&mut self, name: &str, subpermission_of_id: Option<i32>) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar!(
             "INSERT INTO system_permissions (name, subpermission_of_id) VALUES ($1, $2) RETURNING id;", 
@@ -456,6 +547,43 @@ LIMIT $2;
         )
             .fetch_one(&mut *self.transaction)
         .await
+    }
+
+    pub async fn get_children_of_job_title_by_id(&mut self, job_title_id: i32) -> Result<Vec<JobTitleEntity>, sqlx::Error> {
+        sqlx::query_as!(JobTitleEntity, "SELECT * FROM job_titles WHERE parent_job_title_id = $1", job_title_id)
+            .fetch_all(&mut *self.transaction)
+        .await
+    }
+
+    pub async fn get_job_titles_from_predefined_list_that_have_children(&mut self, permission_ids_to_check: Vec<i32>) -> Result<Vec<i32>, sqlx::Error> {
+        sqlx::query_scalar!(
+            "SELECT id FROM job_titles WHERE parent_job_title_id = ANY($1)", 
+            &permission_ids_to_check[..]
+        )
+            .fetch_all(&mut *self.transaction)
+        .await
+    }
+
+    pub async fn set_company_department_for_multiple_job_title_ids(&mut self, job_title_ids: Vec<i32>, company_department: Option<i32>) -> Result<(), sqlx::Error> {
+        sqlx::query!("UPDATE job_titles SET company_department_id = $1 WHERE id = ANY($2);", company_department, &job_title_ids[..])
+            .execute(&mut *self.transaction)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn update_job_title(&mut self, args: &UpdateJobTitleArgs) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE job_titles SET name = $1, parent_job_title_id = $2, company_department_id = $3 WHERE id = $4",
+            args.name,
+            args.parent_job_title_id,
+            args.company_department_id,
+            args.id,
+        )
+            .execute(&mut *self.transaction)
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -583,6 +711,13 @@ impl fmt::Debug for UpdateUserArgs {
     }
 }
 
+pub struct UpdateJobTitleArgs {
+    pub id: i32,
+    pub name: String,
+    pub parent_job_title_id: Option<i32>,
+    pub company_department_id: Option<i32>,
+}
+
 pub struct CreateJobTitleArgs<'a> {
     pub name: Option<&'a str>,
     pub intranet_name: &'a str,
@@ -593,11 +728,18 @@ pub struct CreateJobTitleArgs<'a> {
 #[derive(sqlx::FromRow, Clone, Default)]
 pub struct PermissionEntity {
     pub id: i32,
-    pub name: String,
+    pub human_id: String,
+    pub description: Option<String>,
+}
+
+#[derive(sqlx::FromRow, Clone, Default)]
+pub struct PermissionEntityWithoutDescription {
+    pub id: i32,
+    pub human_id: String
 }
 
 pub struct JobTitleWithDependencies {
     pub job_title: JobTitleEntity,
     pub company_department: Option<CompanyDepartmentEntity>,
-    pub permissions: Vec<PermissionEntity>,
+    pub permission_ids: Vec<i32>,
 }

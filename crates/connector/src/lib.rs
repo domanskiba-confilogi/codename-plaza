@@ -44,9 +44,17 @@ pub struct JobTitleDto {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct JobTitleWithDependenciesDto {
+    pub job_title: JobTitleDto,
+    pub company_department: Option<CompanyDepartmentDto>,
+    pub permission_ids: Vec<i32>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct PermissionDto {
     pub id: i32,
-    pub name: String,
+    pub human_id: String,
+    pub description: Option<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -190,6 +198,8 @@ pub mod i18n {
         SystemPermissionName,
         PaginationCursor,
         PaginationPerPage,
+        PermissionIds,
+        ParentJobTitleId
     }
 
     impl Translate for FieldTranslationKey {
@@ -218,6 +228,16 @@ pub mod i18n {
                 FieldTranslationKey::PaginationPerPage => {
                     match language {
                         Language::Polish => format!("Ilość wierszy na jednej stronie"),
+                    }
+                }
+                FieldTranslationKey::PermissionIds => {
+                    match language {
+                        Language::Polish => format!("Lista permisji"),
+                    }
+                },
+                FieldTranslationKey::ParentJobTitleId => {
+                    match language {
+                        Language::Polish => format!("Rodzic stanowiska"),
                     }
                 }
             }
@@ -254,7 +274,14 @@ pub mod i18n {
         UnsignedNumberTooBig {
             property_name: FieldTranslationKey,
             max: u32,
-        }
+        },
+        PermissionIdIsInvalid {
+            property_name: FieldTranslationKey,
+        },
+        ParentJobTitleCantHaveParent,
+        JobTitleCantHaveParentAndChildren,
+        ChildJobTitleCantHaveParentAndChildren,
+        ParentJobTitleIdIsInvalid { property_name: FieldTranslationKey },
     }
 
     impl Translate for ValidationTranslationKey {
@@ -298,6 +325,31 @@ pub mod i18n {
                 ValidationTranslationKey::NumberTooBig { property_name, max } => {
                     match language {
                         Language::Polish => format!("Pole \"{}\" ma za dużą wartość! Maximum: {max}", property_name.translate(language))
+                    }
+                }
+                ValidationTranslationKey::PermissionIdIsInvalid { property_name } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" posiada nieprawidłowe ID permisji w jednym z elementów.", property_name.translate(language)),
+                    }
+                }
+                ValidationTranslationKey::ParentJobTitleCantHaveParent => {
+                    match language {
+                        Language::Polish => format!("Stanowisko, które jest rodzicem innego stanowiska nie może mieć rodzica. Relacje są tylko 1 poziomowe."),
+                    }
+                }
+                ValidationTranslationKey::JobTitleCantHaveParentAndChildren => {
+                    match language {
+                        Language::Polish => format!("Stanowisko nie może jednocześnie mieć rodzica oraz być dzieckiem. Relacje są tylko 1 poziomowe."),
+                    }
+                }
+                ValidationTranslationKey::ChildJobTitleCantHaveParentAndChildren => {
+                    match language {
+                        Language::Polish => format!("Stanowisko będące dzieckiem nie może jednocześnie mieć rodzica oraz być dzieckiem. Relacje są tylko 1 poziomowe."),
+                    }
+                }
+                ValidationTranslationKey::ParentJobTitleIdIsInvalid { property_name } => {
+                    match language {
+                        Language::Polish => format!("Pole \"{}\" posiada dane nieistniejącego rodzica.", property_name.translate(language)),
                     }
                 }
             }

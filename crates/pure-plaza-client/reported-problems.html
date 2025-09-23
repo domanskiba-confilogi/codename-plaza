@@ -101,14 +101,6 @@
 			...LOGGED_IN_NAVBAR_ARGS
 		});
 
-		// Helper: escapeHtml required by SelectField
-		// Also used for safe rendering of dynamic strings below.
-		function escapeHtml(str) {
-			return String(str).replace(/[&<>"']/g, s => ({
-				'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-			}[s]));
-		}
-
 		// Sample data (12 tickets)
 		const TICKETS = [
 			{ id: 'T-1001', name: 'Cannot access VPN', category: 'Network', status: 'Waiting for support', createdAt: '2025-08-30T08:25:00Z', updatedAt: '2025-09-01T11:10:00Z' },

@@ -1,6 +1,5 @@
 CREATE TABLE permissions (
 	id SERIAL PRIMARY KEY,
-	name VARCHAR(64) UNIQUE NOT NULL
+	human_id VARCHAR(64) UNIQUE NOT NULL,
+	description VARCHAR(255) DEFAULT NULL
 );
-
--- INSERT INTO permissions (id, name) VALUES (1, );

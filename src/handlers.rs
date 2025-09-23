@@ -6,7 +6,7 @@ use axum::{
     response::{Response, IntoResponse, Redirect}
 };
 use axum_macros::debug_handler;
-use crate::{UnitOfWork, UserEntity};
+use crate::{UnitOfWork, UserEntity, uow};
 use tokio::time::{Duration, Instant};
 use connector::{*, i18n::*};
 use crate::validation::{LoginValidator, CreateSystemPermissionValidator, GetPaginatedDataWithIntegerCursorValidator};
@@ -161,6 +161,19 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(json): Json<LoginReq
         property_name: FieldTranslationKey::Email,
         translation: TranslationKey::Validation(ValidationTranslationKey::InvalidCredentials)
     }.into_with_translation(Language::Polish).into_response());
+}
+
+#[debug_handler]
+pub async fn get_all_permissions(State(state): State<Arc<AppState>>) -> Result<Response, InternalServerError> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    let permissions = uow.get_all_permissions().await?;
+
+    Ok((StatusCode::OK, Json(permissions.into_iter().map(|permission| PermissionDto {
+        id: permission.id,
+        human_id: permission.human_id,
+        description: permission.description,
+    }).collect::<Vec<_>>())).into_response())
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -377,7 +390,7 @@ pub async fn create_system_permission(
     }.validate()) {
         return Err(error.into_with_translation(Language::Polish).into_response());
     }
-    
+
     let mut uow = UnitOfWork::new(state.get_db_pool()).await.unwrap();
 
     let system_permission_id = uow.create_system_permission(&json.name, json.subpermission_of_id).await.unwrap();
@@ -403,6 +416,34 @@ pub struct GetPaginatedJobTitlesResponse {
 }
 
 #[debug_handler]
+pub async fn get_job_titles_with_dependencies(State(state): State<Arc<AppState>>) -> Result<Response, InternalServerError> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    let result = uow.get_job_titles_with_dependencies().await?;
+
+    uow.commit().await?;
+
+    return Ok((StatusCode::OK, Json(result.into_iter().map(|JobTitleWithDependencies { job_title, company_department, permission_ids }| {
+        JobTitleWithDependenciesDto {
+            job_title: JobTitleDto {
+                id: job_title.id,
+                intranet_name: job_title.intranet_name,
+                name: job_title.name,
+                parent_job_title_id: job_title.parent_job_title_id,
+                company_department_id: job_title.company_department_id,
+            },
+            company_department: company_department.map(|company_department| {
+                CompanyDepartmentDto {
+                    id: company_department.id,
+                    name: company_department.name,
+                }
+            }),
+            permission_ids
+        }
+    }).collect::<Vec<_>>())).into_response());
+}
+
+#[debug_handler]
 pub async fn get_paginated_job_titles(State(state): State<Arc<AppState>>, Query(query): Query<GetPaginatedDataWithIntegerCursorQuery>) -> Result<Response, InternalServerError> {
     if let Err(error) = (GetPaginatedDataWithIntegerCursorValidator {
         cursor: query.cursor,
@@ -424,30 +465,110 @@ pub async fn get_paginated_job_titles(State(state): State<Arc<AppState>>, Query(
         .map(|item| item.job_title.id).unwrap_or(0) + 1;
 
     return Ok((StatusCode::OK, Json(GetPaginatedResponse {
-        items: paginated_result.items.into_iter().map(|JobTitleWithDependencies { job_title, company_department, permissions }| {
-            (
-                JobTitleDto {
+        items: paginated_result.items.into_iter().map(|JobTitleWithDependencies { job_title, company_department, permission_ids }| {
+            JobTitleWithDependenciesDto {
+                job_title: JobTitleDto {
                     id: job_title.id,
                     intranet_name: job_title.intranet_name,
                     name: job_title.name,
                     parent_job_title_id: job_title.parent_job_title_id,
                     company_department_id: job_title.company_department_id,
                 },
-                company_department.map(|company_department| {
+                company_department: company_department.map(|company_department| {
                     CompanyDepartmentDto {
                         id: company_department.id,
                         name: company_department.name,
                     }
                 }),
-                permissions.into_iter().map(|permission| PermissionDto {
-                    id: permission.id,
-                    name: permission.name,
-                }).collect::<Vec<_>>(),
-            )
+                permission_ids
+            }
         }).collect::<Vec<_>>(),
         total: paginated_result.total as u32,
         next_cursor: next_cursor
     })).into_response());
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct UpdateJobTitleBody {
+    id: i32,
+    name: String,
+    parent_job_title_id: Option<i32>,
+    company_department_id: Option<i32>,
+    permission_ids: Vec<i32>,
+}
+
+#[debug_handler]
+pub async fn update_job_title(State(state): State<Arc<AppState>>, Json(json): Json<UpdateJobTitleBody>) -> Result<Response, InternalServerError> {
+    let mut uow = UnitOfWork::new(state.get_db_pool()).await?;
+
+    if !uow.check_if_all_permission_ids_exist(json.permission_ids.clone()).await? {
+        return Ok(ValidationError {
+            property_name: FieldTranslationKey::PermissionIds,
+            translation: TranslationKey::Validation(ValidationTranslationKey::PermissionIdIsInvalid {
+                property_name: FieldTranslationKey::PermissionIds,
+            })
+        }.into_with_translation(Language::Polish).into_response());
+    }
+
+    let children_job_titles = uow.get_children_of_job_title_by_id(json.id).await?;
+
+    if let Some(parent_job_title_id) = json.parent_job_title_id {
+        if let Some(potential_parent_job_title) = uow.find_job_title_by_id(parent_job_title_id).await? {
+            if potential_parent_job_title.parent_job_title_id.is_some() {
+                return Ok(BadRequestError::Message { 
+                    message: ValidationTranslationKey::ParentJobTitleCantHaveParent.translate(Language::Polish)
+                }.into_response());
+            }
+
+            if children_job_titles.len() > 0 {
+                return Ok(BadRequestError::Message { 
+                    message: ValidationTranslationKey::JobTitleCantHaveParentAndChildren.translate(Language::Polish)
+                }.into_response());
+            }
+
+            let potential_parent_job_title_children_id = uow.get_children_of_job_title_by_id(parent_job_title_id)
+                .await?
+                .iter()
+                .map(|job_title| job_title.id).collect::<Vec<i32>>();
+
+            uow.set_company_department_for_multiple_job_title_ids(potential_parent_job_title_children_id, json.company_department_id).await?;
+        } else {
+            return Ok(ValidationError {
+                property_name: FieldTranslationKey::ParentJobTitleId,
+                translation: TranslationKey::Validation(ValidationTranslationKey::ParentJobTitleIdIsInvalid {
+                    property_name: FieldTranslationKey::ParentJobTitleId,
+                })
+            }.into_with_translation(Language::Polish).into_response());
+        }
+    }
+
+
+    if children_job_titles.len() > 0 {
+        let children_job_title_ids = children_job_titles.iter().map(|job_title| job_title.id).collect::<Vec<i32>>();
+
+        let children_that_are_parents = uow.get_job_titles_from_predefined_list_that_have_children(children_job_title_ids.clone()).await?;
+
+        if children_that_are_parents.len() > 0 {
+            return Ok(BadRequestError::Message { 
+                message: ValidationTranslationKey::ChildJobTitleCantHaveParentAndChildren.translate(Language::Polish)
+            }.into_response());
+        }
+
+        uow.set_company_department_for_multiple_job_title_ids(children_job_title_ids, json.company_department_id).await?;
+    }
+
+    uow.update_job_title(&uow::UpdateJobTitleArgs {
+        id: json.id,
+        name: json.name,
+        parent_job_title_id: json.parent_job_title_id,
+        company_department_id: json.company_department_id,
+    }).await?;
+
+    uow.change_job_title_permissions(json.id, json.permission_ids).await?;
+
+    uow.commit().await?;
+
+    Ok((StatusCode::NO_CONTENT, "").into_response())
 }
 
 #[derive(Debug)]

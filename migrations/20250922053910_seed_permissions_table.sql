@@ -1,0 +1,27 @@
+INSERT INTO permissions 
+	(id, human_id, description)
+VALUES
+	(1, 'auth:get-authenticated-user', 'Get authenticated user'),
+	(2, 'users:read-all', 'Read all user data'),
+	(3, 'users:read-all-paginated', 'Read all users data (paginated)'),
+	(4, 'synchronization:request', 'Request synchronization with intranet'),
+	(5, 'synchronization:check-status', 'Check status of synchronization with intranet'),
+	(6, 'create-ticket:onboarding', 'Create onboarding ticket'),
+	(7, 'create-ticket:offboarding', 'Create offboarding ticket'),
+	(8, 'create-ticket:hardware-replacement', 'Create hardware replacement ticket'),
+	(9, 'create-ticket:internet', 'Create internet issue ticket'),
+	(10, 'create-ticket:sound', 'Create sound issue ticket'),
+	(11, 'create-ticket:permissions', 'Create permissions request ticket'),
+	(12, 'create-ticket:unlock-account', 'Create unlock account ticket'),
+	(13, 'create-ticket:other', 'Create "other" ticket'),
+	(14, 'auth:get-reported-tickets', 'Get authenticated user reported tickets'),
+	(15, 'company-departments:read', 'Get all company departments'),
+	(16, 'job-titles:read', 'Get all job titles'),
+	(17, 'auth:comment-tickets', 'Comment inside a ticket'),
+	(18, 'auth:change-ticket-status', 'Change status of a ticket that is owned by an authenticated user'),
+	(19, 'auth:change-ticket-observers', 'Change list of ticket observers inside a ticket owned by an authenticated user'),
+	(20, 'ticket:comment', 'Comment inside others tickets'),
+	(21, 'ticket:change-status', 'Change status inside somebody elses ticket'),
+	(22, 'ticket:change-observers', 'Change list of observers inside somebody elses ticket'),
+	(23, 'permissions:read', 'Read list of all permissions'),
+	(24, 'job-titles:assign-permissions', 'Assign permissions for job titles');

@@ -1,4 +1,4 @@
-localhost {
+dev.plaza.local {
 	encode zstd gzip
 	handle_path /api* {
 		rewrite /api/* /{uri}

@@ -185,34 +185,25 @@ ${escapeHtml(u.jobTitle?.name || u.jobTitle.intranetName)}
 					cardsRoot.innerHTML = cardsHtml;
 				}
 
+				mountOnTableEndSeen('#table-end-sentinel', async () => {
+					try {
+						if (!endReached) {
+							const loadingScreen = mountSuspenseScreen("#loading-screen", {
+								message: "Loading next items...",
+							});
+
+							await fetchUsers();
+							render();
+
+							loadingScreen.destroy();
+						}
+					} catch (error) {
+						reportCriticalError(error);
+					}
+				})
+
 				// Initial render
 				render();
-
-				const sentinel = document.getElementById('table-end-sentinel');
-				const observer = new IntersectionObserver(async ([entry]) => {
-					if (entry.isIntersecting) {
-						try {
-							if (!endReached) {
-								const loadingScreen = mountSuspenseScreen("#loading-screen", {
-									message: "Loading next items...",
-								});
-
-								await fetchUsers();
-								render();
-
-								loadingScreen.destroy();
-							}
-						} catch (error) {
-							reportCriticalError(error);
-						}
-					}
-				}, {
-					root: null,
-					threshold: 0,
-					rootMargin: '0px 0px 150px 0px'
-				});
-				observer.observe(sentinel);
-
 			} catch (error) {
 				reportCriticalError(error);
 			}

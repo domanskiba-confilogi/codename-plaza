@@ -650,7 +650,229 @@ function createApiConnector(config = {}) {
 		}
 	}
 
-	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings, getMicrosoftSignInRedirectionUri, getPaginatedUsers };
+	async function getPaginatedJobTitlesWithDependencies(per_page = 30, cursor = 1) {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const params = new URLSearchParams();
+			params.set("per_page", per_page);
+			params.set("cursor", cursor);
+
+			const res = await fetch(toURL(`/job-titles/paginated?${params.toString()}`), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (typeof data === "object" && data.items && data.total && data.next_cursor) {
+					return result({ 
+						ok: {
+							items: data.items.map(({ job_title, company_department, permission_ids }) => ({
+								jobTitle: convertResponseJobTitle(job_title),
+								companyDepartment: company_department ? convertResponseCompanyDepartment(company_department) : null,
+								permissionIds: permission_ids,
+							})),
+							total: data.total,
+							nextCursor: data.next_cursor,
+						}
+					});
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function getPermissions() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL(`/permissions`), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ 
+						ok: data.map(convertResponsePermission),
+					});
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function updateJobTitle(id, name, parentJobTitleId, companyDepartmentId, permissionIds) {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL(`/job-titles`), {
+				method: 'PUT',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					'Content-Type': 'application/json',
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+				body: JSON.stringify({
+					id,
+					name,
+					parent_job_title_id: parentJobTitleId,
+					company_department_id: companyDepartmentId,
+					permission_ids: permissionIds,
+				})
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({ 
+						ok: data.map(convertResponsePermission),
+					});
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	async function getJobTitlesWithDependencies() {
+		function result({ ok = null, unknownError = null }) {
+			return { ok, unknownError };
+		}
+
+		if (authStore === null) {
+			result({ unknownError: "Auth store has not been initialized" });
+		}
+
+		const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		const timer = controller ? setTimeout(() => controller.abort("request timed out"), timeout) : null;
+
+		try {
+			const authStore = createAuthStore();
+
+			const res = await fetch(toURL('/job-titles/with-dependencies'), {
+				method: 'GET',
+				headers: {
+					'Authorization': `Bearer ${authStore.getAuthorizationToken()}`,
+					...defaultHeaders,
+				},
+				signal: controller ? controller.signal : undefined,
+			});
+
+			if (timer) clearTimeout(timer);
+
+			if (res.status === 200) {
+				const data = await parseJsonSafe(res);
+				if (Array.isArray(data)) {
+					return result({
+						ok: data.map(({ job_title, company_department, permission_ids }) => ({
+							jobTitle: convertResponseJobTitle(job_title),
+							companyDepartment: company_department ? convertResponseCompanyDepartment(company_department) : null,
+							permissionIds: permission_ids,
+						})),
+					});
+				}
+				return result({
+					unknownError: new Error('Unexpected 200 response shape'),
+				});
+			}
+
+			// inne kody traktujemy jako unknownError
+			const fallbackBody = await parseJsonSafe(res);
+			const err = new Error(`HTTP ${res.status}`);
+			err.status = res.status;
+			err.details = fallbackBody;
+			return result({ unknownError: err });
+		} catch (e) {
+			if (timer) clearTimeout(timer);
+			// Abort lub błąd sieci
+			const err = e instanceof Error ? e : new Error(String(e));
+			return result({ unknownError: err });
+		}
+	}
+
+	return { login, getLoggedInUser, getJobTitles, getCompanyDepartments, getLicenses, getSystemPermissions, getMailingGroups, getLicenseToJobTitleMappings, getSystemPermissionToJobTitleMappings, getMicrosoftSignInRedirectionUri, getPaginatedUsers, getPaginatedJobTitlesWithDependencies, getPermissions, updateJobTitle, getJobTitlesWithDependencies };
 }
 
 // High-resolution time when available (browser/Node)
@@ -880,4 +1102,43 @@ function convertResponseUserDto(userFromResponse) {
 		companyDepartment,
 		jobTitle,
 	};
+}
+
+function convertResponseJobTitle(fromResponse) {
+	return {
+		id: fromResponse.id,
+		intranetName: fromResponse.intranet_name,
+		name: fromResponse.name,
+		parentJobTitleId: fromResponse.parent_job_title_id,
+		companyDepartmentId: fromResponse.company_department_id
+	}
+}
+
+function convertResponseCompanyDepartment(fromResponse) {
+	return {
+		id: fromResponse.id,
+		name: fromResponse.name,
+	}
+}
+
+function convertResponsePermission(fromResponse) {
+	return {
+		id: fromResponse.id,
+		humanId: fromResponse.human_id,
+		description: fromResponse.description,
+	}
+}
+
+function mountOnTableEndSeen(id, callback) {
+	const sentinel = document.querySelector(id);
+	const observer = new IntersectionObserver(async ([entry]) => {
+		if (entry.isIntersecting) {
+			callback();
+		}
+	}, {
+		root: null,
+		threshold: 0,
+		rootMargin: '0px 0px 150px 0px'
+	});
+	observer.observe(sentinel);
 }
