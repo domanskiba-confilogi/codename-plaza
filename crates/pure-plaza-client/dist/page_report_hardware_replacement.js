@@ -1,0 +1,263 @@
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+import { createAuthStore } from "./auth_store.js";
+import { mountSuspenseScreen } from "./component_suspense_screen.js";
+import { checkIsLoggedInMiddleware } from "./middlewares.js";
+import { mountNavbar } from "./component_navbar.js";
+import { mountTextField } from "./component_text_field.js";
+import { mountCheckbox } from "./component_checkbox.js";
+import { reportCriticalError, LOGGED_IN_NAVBAR_ARGS, mustQuerySelector } from "./helpers.js";
+import { mountButton } from "./component_button.js";
+var authStore = createAuthStore();
+var loadingScreen = mountSuspenseScreen("#loading-screen", {
+    message: "Loading needed data...",
+});
+(function () { return __awaiter(void 0, void 0, void 0, function () {
+    var loggedInUser_1, search, targetPerson_1, fields_1, submit_1, error_1;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                _a.trys.push([0, 2, , 3]);
+                return [4 /*yield*/, checkIsLoggedInMiddleware(authStore)];
+            case 1:
+                _a.sent();
+                loggedInUser_1 = authStore.getLoggedInUser();
+                search = new URLSearchParams(new URL(window.location).search);
+                targetPerson_1 = search.get("target_person");
+                if (targetPerson_1 !== "myself" && targetPerson_1 !== "colleague") {
+                    throw new Error("Invalid target_person search param.");
+                }
+                loadingScreen.destroy();
+                Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(function (element) {
+                    element.classList.remove("hidden");
+                });
+                mountNavbar('#navbar-root', __assign({ brandHref: '/', brandName: 'Confilogi', brandAccent: 'IT Support' }, LOGGED_IN_NAVBAR_ARGS));
+                fields_1 = {
+                    firstNameField: null,
+                    secondNameField: null,
+                    lastNameField: null,
+                    streetField: mountTextField('#street-field', {
+                        label: 'Street name',
+                        type: 'text',
+                        placeholder: 'e.g., Main Street',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    houseNumberField: mountTextField('#house-number-field', {
+                        label: 'House number',
+                        type: 'text',
+                        placeholder: 'e.g., 12A',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    apartmentNumberField: mountTextField('#apartment-number-field', {
+                        label: 'Apartment number (optional)',
+                        type: 'text',
+                        placeholder: 'e.g., 5',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    countryField: mountTextField('#country-field', {
+                        label: 'Country',
+                        type: 'text',
+                        placeholder: 'e.g., Poland',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    cityField: mountTextField('#city-field', {
+                        label: 'City',
+                        type: 'text',
+                        placeholder: 'e.g., Warsaw',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    postalCodeField: mountTextField('#postal-code-field', {
+                        label: 'Postal code',
+                        type: 'text',
+                        placeholder: 'e.g., 00-001',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    phoneField: mountTextField('#phone-field', {
+                        label: 'Cellphone number',
+                        type: 'text',
+                        placeholder: 'e.g., +48 600 000 000',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    emailField: mountTextField('#email-field', {
+                        label: 'Email address',
+                        type: 'email',
+                        placeholder: 'name@domain.com',
+                        value: '',
+                        clearErrorOnInput: true,
+                    }),
+                    hardwareLaptopField: mountCheckbox("#hardware-laptop-checkbox-root", {
+                        label: "Laptop"
+                    }),
+                    hardwareLaptopChargerField: mountCheckbox("#hardware-laptop-charger-checkbox-root", {
+                        label: "Laptop charger"
+                    }),
+                    hardwareMouseField: mountCheckbox("#hardware-mouse-checkbox-root", {
+                        label: "Mouse"
+                    }),
+                    hardwareHeadsetField: mountCheckbox("#hardware-headset-checkbox-root", {
+                        label: "Headset"
+                    }),
+                    hardwareUsbCNetworkCardField: mountCheckbox("#hardware-usb-c-network-card-checkbox-root", {
+                        label: "USB-C Network Card"
+                    }),
+                    hardwareUsbAWirelessNetworkCardField: mountCheckbox("#hardware-usb-a-wireless-network-card-checkbox-root", {
+                        label: "USB-A Wireless Network Card"
+                    }),
+                    hardwareLaptopBagField: mountCheckbox("#hardware-laptop-bag-checkbox-root", {
+                        label: "Laptop bag"
+                    }),
+                    hardwarePhoneField: mountCheckbox("#hardware-phone-checkbox-root", {
+                        label: "Phone"
+                    }),
+                    hardwarePhoneChargerField: mountCheckbox("#hardware-phone-charger-checkbox-root", {
+                        label: "Phone charger"
+                    }),
+                };
+                if (targetPerson_1 === "colleague") {
+                    fields_1.firstNameField = mountTextField('#first-name-field', {
+                        label: 'Name',
+                        type: 'text',
+                        placeholder: 'Enter name...',
+                        value: '',
+                        clearErrorOnInput: true,
+                    });
+                    fields_1.secondNameField = mountTextField('#second-name-field', {
+                        label: 'Second name (optional)',
+                        type: 'text',
+                        placeholder: 'Enter second name...',
+                        value: '',
+                        clearErrorOnInput: true,
+                    });
+                    fields_1.lastNameField = mountTextField('#last-name-field', {
+                        label: 'Surname',
+                        type: 'text',
+                        placeholder: 'Enter surname...',
+                        value: '',
+                        clearErrorOnInput: true,
+                    });
+                }
+                else {
+                    mustQuerySelector(document.body, "#colleague-data").outerHTML = "";
+                }
+                mountButton('#cancel-btn', {
+                    label: 'Cancel',
+                    variant: 'ghost',
+                    size: 'sm',
+                    onClick: function () {
+                        window.location.href = '/report-problem.html';
+                    }
+                });
+                mountButton('#submit-btn', {
+                    label: 'Submit',
+                    variant: 'primary',
+                    size: 'md',
+                    type: 'button',
+                    onClick: function () {
+                        submit_1();
+                    }
+                });
+                submit_1 = function () { return __awaiter(void 0, void 0, void 0, function () {
+                    var payload;
+                    return __generator(this, function (_a) {
+                        try {
+                            payload = {
+                                person: targetPerson_1 === "colleague" ? "".concat(fields_1.firstNameField.getValue().trim(), " ").concat(fields_1.secondNameField.getValue().trim(), " ").concat(fields_1.lastNameField.getValue().trim()) : "".concat(loggedInUser_1.fullName, " (").concat(loggedInUser_1.email, ")"),
+                                postalAddress: {
+                                    street: fields_1.streetField.getValue().trim(),
+                                    houseNumber: fields_1.houseNumberField.getValue().trim(),
+                                    apartmentNumber: fields_1.apartmentNumberField.getValue().trim(),
+                                    country: fields_1.countryField.getValue().trim(),
+                                    city: fields_1.cityField.getValue().trim(),
+                                    postalCode: fields_1.postalCodeField.getValue().trim(),
+                                    cellphone: fields_1.phoneField.getValue().trim(),
+                                    email: fields_1.emailField.getValue().trim(),
+                                },
+                                hardware: [],
+                            };
+                            if (fields_1.hardwareLaptopField.getValue())
+                                payload.hardware.push('laptop');
+                            if (fields_1.hardwareLaptopChargerField.getValue())
+                                payload.hardware.push('laptop-charger');
+                            if (fields_1.hardwareMouseField.getValue())
+                                payload.hardware.push('mouse');
+                            if (fields_1.hardwareHeadsetField.getValue())
+                                payload.hardware.push('headset');
+                            if (fields_1.hardwareUsbCNetworkCardField.getValue())
+                                payload.hardware.push('usb-c-network-card');
+                            if (fields_1.hardwareUsbAWirelessNetworkCardField.getValue())
+                                payload.hardware.push('usb-a-wireless-network-card');
+                            if (fields_1.hardwareLaptopBagField.getValue())
+                                payload.hardware.push('laptop-bag');
+                            if (fields_1.hardwarePhoneField.getValue())
+                                payload.hardware.push('phone');
+                            if (fields_1.hardwarePhoneChargerField.getValue())
+                                payload.hardware.push('phone-charger');
+                            console.log(payload);
+                        }
+                        catch (error) {
+                            reportCriticalError(error);
+                        }
+                        return [2 /*return*/];
+                    });
+                }); };
+                return [3 /*break*/, 3];
+            case 2:
+                error_1 = _a.sent();
+                reportCriticalError(error_1);
+                return [3 /*break*/, 3];
+            case 3: return [2 /*return*/];
+        }
+    });
+}); })();
