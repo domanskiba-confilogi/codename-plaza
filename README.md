@@ -1,0 +1,4 @@
+ - [ ] Frontend conversion to typescript
+ - [ ] i18n
+ - [ ] Form Validation
+ - [ ] Job subtitles working correctly (PLP1, PLP2, etc.)

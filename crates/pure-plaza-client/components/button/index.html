@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Przykład użycia mountButton (Tailwind + Pure JS)</title>
+		<link rel="stylesheet" href="/tailwind.css">
+	</head>
+	<body class="bg-neutral-950 text-neutral-100 min-h-screen p-8">
+		<header class="mb-8 space-y-2">
+			<h1 class="text-2xl font-semibold">Przykład komponentu Button</h1>
+			<p class="text-neutral-400">
+				Pure JS + TailwindCSS. Poniżej kilka instancji komponentu z różnymi wariantami, rozmiarami i trybami.
+			</p>
+		</header>
+
+		<main class="flex flex-col gap-12">
+
+			<!-- Instancja 1: Podstawowy przycisk + akcje sterujące -->
+			<section class="space-y-4">
+				<h2 class="text-lg font-medium">Instancja 1 – Podstawowy (primary)</h2>
+				<div id="btn1"></div>
+				<div class="flex flex-wrap gap-3">
+					<button id="i1-toggle-loading" class="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black">Przełącz ładowanie</button>
+					<button id="i1-toggle-disabled" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Włącz/wyłącz</button>
+					<button id="i1-to-secondary" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień na Secondary</button>
+					<button id="i1-to-primary" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień na Primary</button>
+					<button id="i1-sm" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Rozmiar: SM</button>
+					<button id="i1-md" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Rozmiar: MD</button>
+					<button id="i1-lg" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Rozmiar: LG</button>
+					<button id="i1-block" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Przełącz pełną szerokość</button>
+					<button id="i1-label" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw etykietę</button>
+					<button id="i1-state" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Pokaż state</button>
+				</div>
+			</section>
+
+			<!-- Instancja 2: Link + wariant outline/ghost + ikony -->
+			<section class="space-y-4">
+				<h2 class="text-lg font-medium">Instancja 2 – Link (outline) z ikoną</h2>
+				<div id="btn2"></div>
+				<div class="flex flex-wrap gap-3">
+					<button id="i2-set-href" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Ustaw href → nowa karta</button>
+					<button id="i2-remove-href" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Usuń href (przycisk)</button>
+					<button id="i2-to-ghost" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień na Ghost</button>
+					<button id="i2-to-outline" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień na Outline</button>
+					<button id="i2-icon-change" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Zmień ikony</button>
+				</div>
+			</section>
+
+			<!-- Instancja 3: Przegląd wariantów i rozmiarów -->
+			<section class="space-y-4">
+				<h2 class="text-lg font-medium">Instancja 3 – Różne warianty i rozmiary</h2>
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Primary / md</p>
+						<div id="btn3a"></div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Secondary / md</p>
+						<div id="btn3b"></div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Success / lg</p>
+						<div id="btn3c"></div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Danger / sm</p>
+						<div id="btn3d"></div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Warning / md</p>
+						<div id="btn3e"></div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm text-neutral-400">Ghost / md (rounded-full)</p>
+						<div id="btn3f"></div>
+					</div>
+				</div>
+			</section>
+
+		</main>
+
+		<!-- Uwaga: ./main.js powinien eksportować globalnie funkcję window.mountButton(...) -->
+		<script src="./main.js"></script>
+		<script>
+/* Proste ikony SVG do demonstracji */
+const RIGHT_ARROW_SVG = `
+<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+<path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l5 5a.997.997 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L13.586 10H4a1 1 0 110-2h9.586l-3.293-3.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+</svg>`.trim();
+
+const EXTERNAL_LINK_SVG = `
+<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+<path d="M14 3h7v7h-2V6.414l-9.293 9.293-1.414-1.414L17.586 5H14V3z"></path>
+<path d="M5 5h6v2H7v10h10v-4h2v6H5V5z"></path>
+</svg>`.trim();
+
+const CHECK_SVG = `
+<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.364 7.364a1 1 0 01-1.414 0L3.293 10.8a1 1 0 111.414-1.414l3.011 3.01 6.657-6.657a1 1 0 011.414 0z" clip-rule="evenodd" />
+</svg>`.trim();
+
+const TRASH_SVG = `
+<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+<path d="M9 3h6a1 1 0 011 1v1h4v2H4V5h4V4a1 1 0 011-1z"></path>
+<path d="M6 9h12l-1 11a2 2 0 01-2 2H9a2 2 0 01-2-2L6 9z"></path>
+</svg>`.trim();
+
+/* Instancja 1 */
+const api1 = mountButton('#btn1', {
+	label: 'Rozpocznij',
+	variant: 'primary',
+	size: 'md',
+	leadingIconSvg: RIGHT_ARROW_SVG,
+	onClick: () => console.log('[btn1] kliknięty'),
+});
+
+let i1Loading = false;
+let i1Disabled = false;
+let i1Block = false;
+
+document.getElementById('i1-toggle-loading').addEventListener('click', () => {
+	i1Loading = !i1Loading;
+	api1.setLoading(i1Loading);
+});
+
+document.getElementById('i1-toggle-disabled').addEventListener('click', () => {
+	i1Disabled = !i1Disabled;
+	api1.setDisabled(i1Disabled);
+});
+
+document.getElementById('i1-to-secondary').addEventListener('click', () => {
+	api1.setVariant('secondary');
+});
+
+document.getElementById('i1-to-primary').addEventListener('click', () => {
+	api1.setVariant('primary');
+});
+
+document.getElementById('i1-sm').addEventListener('click', () => api1.setSize('sm'));
+document.getElementById('i1-md').addEventListener('click', () => api1.setSize('md'));
+document.getElementById('i1-lg').addEventListener('click', () => api1.setSize('lg'));
+
+document.getElementById('i1-block').addEventListener('click', () => {
+	i1Block = !i1Block;
+	api1.setBlock(i1Block);
+});
+
+document.getElementById('i1-label').addEventListener('click', () => {
+	const next = prompt('Nowa etykieta przycisku:', 'Start!');
+	if (next !== null) api1.setLabel(next);
+});
+
+document.getElementById('i1-state').addEventListener('click', () => {
+	alert('Stan przycisku 1:\n' + JSON.stringify(api1.getState(), null, 2));
+});
+
+/* Instancja 2: Link + outline/ghost + ikony */
+const api2 = mountButton('#btn2', {
+	label: 'Dokumentacja',
+	variant: 'outline',
+	trailingIconSvg: EXTERNAL_LINK_SVG,
+});
+api2.on('click', () => console.log('[btn2] kliknięty'));
+
+document.getElementById('i2-set-href').addEventListener('click', () => {
+	api2.setHref('https://example.com/docs', '_blank', 'noopener noreferrer');
+});
+
+document.getElementById('i2-remove-href').addEventListener('click', () => {
+	api2.setHref(null);
+});
+
+document.getElementById('i2-to-ghost').addEventListener('click', () => {
+	api2.setVariant('ghost');
+});
+
+document.getElementById('i2-to-outline').addEventListener('click', () => {
+	api2.setVariant('outline');
+});
+
+let iconToggle = false;
+document.getElementById('i2-icon-change').addEventListener('click', () => {
+	iconToggle = !iconToggle;
+	if (iconToggle) {
+		api2.setIcons({ leading: CHECK_SVG, trailing: '' });
+		api2.setLabel('Zatwierdź');
+		api2.setVariant('success');
+	} else {
+		api2.setIcons({ leading: '', trailing: EXTERNAL_LINK_SVG });
+		api2.setLabel('Dokumentacja');
+		api2.setVariant('outline');
+	}
+});
+
+/* Instancja 3: Różne warianty */
+const api3a = mountButton('#btn3a', {
+	label: 'Primary',
+	variant: 'primary',
+	size: 'md',
+});
+const api3b = mountButton('#btn3b', {
+	label: 'Secondary',
+	variant: 'secondary',
+	size: 'md',
+});
+const api3c = mountButton('#btn3c', {
+	label: 'Sukces',
+	variant: 'success',
+	size: 'lg',
+	leadingIconSvg: CHECK_SVG,
+});
+const api3d = mountButton('#btn3d', {
+	label: 'Usuń',
+	variant: 'danger',
+	size: 'sm',
+	leadingIconSvg: TRASH_SVG,
+});
+const api3e = mountButton('#btn3e', {
+	label: 'Uwaga',
+	variant: 'warning',
+	size: 'md',
+});
+const api3f = mountButton('#btn3f', {
+	label: 'Ghost',
+	variant: 'ghost',
+	size: 'md',
+	rounded: 'full',
+});
+
+/* Szybkie demo działania API */
+setTimeout(() => api3e.setLoading(true), 800);
+setTimeout(() => api3e.setLoading(false), 2400);
+</script>
+	</body>
+</html>

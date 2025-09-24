@@ -7,12 +7,16 @@
 		<link rel="stylesheet" href="/tailwind.css">
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
-		<div id="loading-screen"></div>
+		<div id="error-modal-root"></div>
+		<!-- Root for modals -->
+		<div id="dept-modal-root"></div>
+		<!-- Suspense/loader root -->
+		<div id="loader-root"></div>
+		<!-- Navbar -->
 		<div id="navbar-root"></div>
-		<div id="company-department-modal-root"></div>
 
 		<!-- Main -->
-		<main class="flex-1 hidden" data-unhide="true">
+		<main class="flex-1">
 			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
 				<!-- Page header -->
 				<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -21,18 +25,74 @@
 						<p class="text-neutral-400 text-sm">Create, edit, delete departments and connect job titles.</p>
 					</div>
 					<div class="flex items-center gap-2">
-						<div id="refresh-btn"></div>
-						<div id="new-company-department-btn"></div>
+						<div id="sync-jobtitles-btn"></div>
+						<div id="new-dept-btn"></div>
 					</div>
 				</div>
 
+				<!-- Toolbar -->
+				<div class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 mb-6">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+						<!-- Search -->
+						<div id="search-field"></div>
+						<!-- Job title filter -->
+						<div>
+							<div id="jobtitle-filter"></div>
+						</div>
+						<!-- Sorting -->
+						<div class="flex flex-col">
+							<label for="sort-select" class="text-sm font-medium mb-2">Sort by</label>
+							<select id="sort-select" class="w-full rounded-md bg-neutral-950/60 text-neutral-100 placeholder-neutral-500 px-3.5 py-2.5 transition hover:bg-neutral-900/60 focus:outline-none focus:bg-neutral-950/80 ring-1 ring-inset ring-neutral-800 focus:ring-2 focus:ring-blue-400/60">
+								<option value="newest">Newest first</option>
+								<option value="oldest">Oldest first</option>
+								<option value="name-asc">Name A–Z</option>
+								<option value="name-desc">Name Z–A</option>
+								<option value="titles-asc">Job titles count (fewest)</option>
+								<option value="titles-desc">Job titles count (most)</option>
+								<option value="updated-desc">Last updated (latest)</option>
+								<option value="updated-asc">Last updated (oldest)</option>
+							</select>
+							<div class="mt-3" id="reset-filters-btn"></div>
+						</div>
+						<!-- Legend / Info -->
+						<div class="text-sm text-neutral-400">
+							<p class="mb-1">Job titles sync: new titles appear automatically and can be connected to departments.</p>
+							<p class="text-xs text-neutral-500">Unconnected titles are selectable like any other.</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Alert for unconfigured titles (dynamic) -->
+				<div id="unconfigured-alert" class="mb-6 bg-amber-900/20 ring-1 ring-amber-700/40 rounded-2xl p-4">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+						<div class="flex items-start gap-3">
+							<div class="mt-0.5 h-2.5 w-2.5 rounded-full bg-amber-400/90 ring-4 ring-amber-400/10"></div>
+							<div>
+								<p class="text-amber-300 font-medium">Detected unconfigured job titles</p>
+								<p class="text-sm text-amber-200/80 mb-3">Some synchronized job titles are not assigned to any company department. Configure them to make them accessible inside forms.</p>
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">
+									Junior HR Specialist
+								</span>
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">
+									Senior HR Specialist
+								</span>
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<div id="alert-bulk-fix"></div>
+							<button id="dismiss-alert" class="text-xs text-amber-200/80 hover:text-amber-100 underline underline-offset-2">Dismiss</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Summary -->
 				<div class="flex items-center justify-between mb-3">
 					<p id="results-summary" class="text-sm text-neutral-400">Showing 0 departments</p>
 					<p class="text-xs text-neutral-500">Live updates as you create, edit or connect titles</p>
 				</div>
 
 				<!-- Mobile list (cards) -->
-				<div id="cards-root" class="grid grid-cols-1 gap-3 md:hidden"></div>
+				<div id="depts-cards-root" class="grid grid-cols-1 gap-3 md:hidden"></div>
 
 				<!-- Desktop table (md+) -->
 				<div id="depts-table-wrapper" class="hidden md:block bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl overflow-hidden">
@@ -41,10 +101,14 @@
 							<thead class="bg-neutral-900/60">
 								<tr>
 									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Department</th>
+									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Description</th>
+									<th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Job titles</th>
+									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Created</th>
+									<th scope="col" class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">Updated</th>
 									<th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">Actions</th>
 								</tr>
 							</thead>
-							<tbody id="tbody" class="divide-y divide-neutral-800"></tbody>
+							<tbody id="depts-tbody" class="divide-y divide-neutral-800"></tbody>
 						</table>
 					</div>
 				</div>
@@ -60,8 +124,649 @@
 			</section>
 		</main>
 
-		<div id="error-modal-root"></div>
+		<!-- Scripts -->
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
+		<script>
+		// Navbar
+		const navbar = mountNavbar('#navbar-root', {
+			brandHref: '/',
+			brandName: 'Confilogi',
+			brandAccent: 'IT Support',
+			...LOGGED_IN_NAVBAR_ARGS
+		}); // [7]
 
-		<script type="module" src="/dist/page_company_departments_management.js"></script>
+		// Helper: escapeHtml required by SelectField and safe HTML rendering. [1]
+		function escapeHtml(str) {
+			return String(str).replace(/[&<>"']/g, s => ({
+				'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+			}[s]));
+		} // [1]
+
+		// Suspense screen (overlay loader) [2]
+		const loader = mountSuspenseScreen('#loader-root', {
+			message: 'Working...',
+			hint: 'Please wait a moment',
+			classes: 'hidden fixed inset-0 bg-black/40 backdrop-blur-sm',
+			fullScreen: true
+		}); // [2]
+
+		// Sample synchronized job titles (arrive from external service)
+		// New titles added here should automatically become available to connect.
+		let JOB_TITLES_SYNCED = [
+			{ id: 'JT-1001', name: 'IT Support Specialist' },
+			{ id: 'JT-1002', name: 'Senior IT Support' },
+			{ id: 'JT-1003', name: 'Helpdesk Technician' },
+			{ id: 'JT-1004', name: 'Network Administrator' },
+			{ id: 'JT-1005', name: 'Systems Analyst' },
+		];
+
+		// Departments dataset
+		let DEPARTMENTS = [
+			{
+				id: 'D-1001',
+				name: 'Customer Support',
+				description: 'Handles end-user issues and requests',
+				jobTitleIds: ['JT-1001', 'JT-1003'],
+				createdAt: '2025-06-01T09:00:00Z',
+				updatedAt: '2025-09-05T15:00:00Z'
+			},
+			{
+				id: 'D-1002',
+				name: 'Infrastructure',
+				description: 'Network and systems maintenance',
+				jobTitleIds: ['JT-1004', 'JT-1005'],
+				createdAt: '2025-06-15T10:00:00Z',
+				updatedAt: '2025-08-30T08:30:00Z'
+			},
+			{
+				id: 'D-1003',
+				name: 'Service Desk',
+				description: 'First-contact helpdesk and triage',
+				jobTitleIds: ['JT-1001', 'JT-1002', 'JT-1003'],
+				createdAt: '2025-07-20T12:00:00Z',
+				updatedAt: '2025-08-20T12:00:00Z'
+			}
+		];
+
+		// Computed helpers
+		function jobTitleMap() {
+			const map = new Map();
+			for (const jt of JOB_TITLES_SYNCED) map.set(jt.id, jt.name);
+			return map;
+		}
+		function allJobTitleItems() {
+			// Build SelectField items from synchronized titles. [1]
+			return JOB_TITLES_SYNCED
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map(jt => ({ value: jt.id, displayText: jt.name }));
+		} // [1]
+
+		// State
+		const state = {
+			search: '',
+			titleFilterIds: [],
+			sort: 'newest',
+		};
+
+		// Components
+		const newDeptBtn = mountButton('#new-dept-btn', {
+			label: 'New department',
+			variant: 'primary',
+			size: 'md',
+			onClick: () => openCreateDepartmentModal()
+		}); // [4]
+
+		const syncJobTitlesBtn = mountButton('#sync-jobtitles-btn', {
+			label: 'Sync job titles',
+			variant: 'secondary',
+			size: 'md',
+			onClick: () => simulateJobTitlesSync()
+		}); // [4]
+
+		const emptyResetBtn = mountButton('#empty-reset', {
+			label: 'Reset filters',
+			variant: 'secondary',
+			size: 'sm',
+			onClick: () => resetFilters(),
+		}); // [4]
+
+		const resetFiltersBtn = mountButton('#reset-filters-btn', {
+			label: 'Reset filters',
+			variant: 'ghost',
+			size: 'sm',
+			onClick: () => resetFilters(),
+		}); // [4]
+
+		const searchField = mountTextField('#search-field', {
+			type: 'text',
+			label: 'Search departments',
+			placeholder: 'Search by department or description...',
+			value: '',
+			clearErrorOnInput: true,
+			onInput: ({ new_value }) => {
+				state.search = (new_value || '').trim().toLowerCase();
+				render();
+			},
+		}); // [3]
+
+		// Job title filter (multi-select)
+		const jobTitleFilter = mountSelectField('#jobtitle-filter', allJobTitleItems(), {
+			label: 'Job titles',
+			placeholder: 'Filter by job title...',
+			onSelect: () => {
+				setTimeout(() => {
+					state.titleFilterIds = jobTitleFilter.getChosen();
+					render();
+				}, 0); // ensure SelectField internal state is applied [1]
+			}
+		}); // [1]
+
+		// Sort select
+		const sortSelect = document.querySelector('#sort-select');
+		sortSelect.addEventListener('change', () => {
+			state.sort = sortSelect.value;
+			render();
+		});
+
+		function resetFilters() {
+			searchField.clear({ silent: true }); // [3]
+			jobTitleFilter.clear(); // [1]
+			sortSelect.value = 'newest';
+			state.search = '';
+			state.titleFilterIds = [];
+			state.sort = 'newest';
+			render();
+		}
+
+		// Rendering
+		const tbody = document.getElementById('depts-tbody');
+		const summaryEl = document.getElementById('results-summary');
+		const emptyStateEl = document.getElementById('empty-state');
+		const cardsRoot = document.getElementById('depts-cards-root');
+
+		function cleanupRowButtons() {
+			for (const b of rowButtons) {
+				try { b.destroy && b.destroy(); } catch {}
+			}
+			rowButtons = [];
+		}
+		let rowButtons = []; // per-row button instances for cleanup
+
+		function applyFiltersAndSort(data) {
+			let rows = data.slice();
+			const jtm = jobTitleMap();
+
+			if (state.search) {
+				const q = state.search;
+				rows = rows.filter(d =>
+					d.name.toLowerCase().includes(q) ||
+						(d.description || '').toLowerCase().includes(q)
+				);
+			}
+
+			if (state.titleFilterIds.length > 0) {
+				const wanted = new Set(state.titleFilterIds);
+				rows = rows.filter(d => d.jobTitleIds.some(id => wanted.has(id)));
+			}
+
+			rows.sort((a, b) => {
+				const ca = new Date(a.createdAt), cb = new Date(b.createdAt);
+				const ua = new Date(a.updatedAt), ub = new Date(b.updatedAt);
+				const ta = a.jobTitleIds.length, tb = b.jobTitleIds.length;
+				switch (state.sort) {
+					case 'newest': return cb - ca;
+					case 'oldest': return ca - cb;
+					case 'name-asc': return a.name.localeCompare(b.name);
+					case 'name-desc': return b.name.localeCompare(a.name);
+					case 'titles-asc': return ta - tb;
+					case 'titles-desc': return tb - ta;
+					case 'updated-desc': return ub - ua;
+					case 'updated-asc': return ua - ub;
+					default: return 0;
+				}
+			});
+
+			return rows;
+		}
+
+		function renderJobTitleChips(ids, limit = 3) {
+			const map = jobTitleMap();
+			const chips = ids.slice(0, limit).map(id => `
+<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md ring-1 ring-neutral-800 bg-neutral-800 text-neutral-300">
+${escapeHtml(map.get(id) || id)}
+</span>
+`).join('');
+			const extra = ids.length > limit
+				? `<span class="text-xs text-neutral-400">+${ids.length - limit} more</span>`
+				: '';
+			return chips + extra;
+		}
+
+		function render() {
+			const filtered = applyFiltersAndSort(DEPARTMENTS);
+			summaryEl.textContent = `Showing ${filtered.length} of ${DEPARTMENTS.length} departments`;
+
+			cleanupRowButtons();
+
+			if (filtered.length === 0) {
+				tbody.innerHTML = '';
+				cardsRoot.innerHTML = '';
+				emptyStateEl.classList.remove('hidden');
+				return;
+			}
+			emptyStateEl.classList.add('hidden');
+
+			const jtm = jobTitleMap();
+
+			// Desktop table rows
+			const rowsHtml = filtered.map(d => {
+				const created = new Date(d.createdAt).toLocaleString();
+				const updated = new Date(d.updatedAt).toLocaleString();
+				const editId = `edit-${d.id}`;
+				const titlesId = `titles-${d.id}`;
+				const delId = `del-${d.id}`;
+				return `
+<tr class="hover:bg-neutral-900/40 transition">
+<td class="px-4 py-3 align-top">
+<div class="flex flex-col">
+<span class="font-semibold">${escapeHtml(d.name)}</span>
+<span class="text-xs text-neutral-400">ID: ${escapeHtml(d.id)}</span>
+</div>
+</td>
+<td class="px-4 py-3 align-top">
+<span class="text-neutral-300">${escapeHtml(d.description || '—')}</span>
+</td>
+<td class="px-4 py-3 align-top">
+<div class="flex flex-wrap gap-1.5">
+${renderJobTitleChips(d.jobTitleIds, 4)}
+</div>
+</td>
+<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300">
+${escapeHtml(created)}
+</td>
+<td class="hidden lg:table-cell px-4 py-3 align-top text-neutral-300">
+${escapeHtml(updated)}
+</td>
+<td class="px-4 py-3 align-top">
+<div class="flex items-center justify-end gap-2">
+<span id="${titlesId}"></span>
+<span id="${editId}"></span>
+<span id="${delId}"></span>
+</div>
+</td>
+</tr>
+`;
+			}).join('');
+			tbody.innerHTML = rowsHtml;
+
+			// Mobile cards
+			const cardsHtml = filtered.map(d => {
+				const created = new Date(d.createdAt).toLocaleString();
+				const updated = new Date(d.updatedAt).toLocaleString();
+				const editIdM = `edit-m-${d.id}`;
+				const titlesIdM = `titles-m-${d.id}`;
+				const delIdM = `del-m-${d.id}`;
+				return `
+<article class="bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 flex flex-col gap-3 hover:bg-neutral-900 transition">
+<div class="flex items-start justify-between gap-3">
+<div>
+<h2 class="text-base font-semibold leading-snug">${escapeHtml(d.name)}</h2>
+<p class="text-sm text-neutral-400">${escapeHtml(d.description || '—')}</p>
+</div>
+<span class="text-xs text-neutral-500">ID: ${escapeHtml(d.id)}</span>
+</div>
+<div class="flex flex-wrap gap-1.5">
+${renderJobTitleChips(d.jobTitleIds, 6)}
+</div>
+<div class="text-xs text-neutral-500 flex flex-wrap gap-x-4 gap-y-1">
+<span>Created: ${escapeHtml(created)}</span>
+<span>Updated: ${escapeHtml(updated)}</span>
+</div>
+<div class="mt-1 flex items-center justify-end gap-2">
+<span id="${titlesIdM}"></span>
+<span id="${editIdM}"></span>
+<span id="${delIdM}"></span>
+</div>
+</article>
+`;
+			}).join('');
+			cardsRoot.innerHTML = cardsHtml;
+
+			// Mount per-row action buttons
+			for (const d of filtered) {
+				// Desktop
+				const titlesBtn = mountButton(`#titles-${d.id}`, {
+					label: 'Manage titles',
+					variant: 'ghost',
+					size: 'sm',
+					onClick: () => openManageTitlesModal(d.id),
+				}); // [4]
+				const editBtn = mountButton(`#edit-${d.id}`, {
+					label: 'Edit',
+					variant: 'secondary',
+					size: 'sm',
+					onClick: () => openEditDepartmentModal(d.id),
+				}); // [4]
+				const delBtn = mountButton(`#del-${d.id}`, {
+					label: 'Delete',
+					variant: 'danger',
+					size: 'sm',
+					onClick: () => confirmDeleteDepartment(d.id),
+				}); // [4]
+
+				// Mobile
+				const titlesBtnM = mountButton(`#titles-m-${d.id}`, {
+					label: 'Manage titles',
+					variant: 'ghost',
+					size: 'sm',
+					onClick: () => openManageTitlesModal(d.id),
+				}); // [4]
+				const editBtnM = mountButton(`#edit-m-${d.id}`, {
+					label: 'Edit',
+					variant: 'secondary',
+					size: 'sm',
+					onClick: () => openEditDepartmentModal(d.id),
+				}); // [4]
+				const delBtnM = mountButton(`#del-m-${d.id}`, {
+					label: 'Delete',
+					variant: 'danger',
+					size: 'sm',
+					onClick: () => confirmDeleteDepartment(d.id),
+				}); // [4]
+
+				for (const b of [titlesBtn, editBtn, delBtn, titlesBtnM, editBtnM, delBtnM]) {
+					if (b) rowButtons.push(b);
+				}
+			}
+		}
+
+		// Actions
+		function withLoader(message, hint, fn) {
+			loader.setMessage(message || 'Working...');
+			if (hint == null) loader.setHint(null); else loader.setHint(hint);
+			loader.show();
+			return new Promise((resolve, reject) => {
+				setTimeout(async () => {
+					try {
+						const res = await fn();
+						resolve(res);
+					} catch (e) {
+						reject(e);
+					} finally {
+						loader.hide();
+					}
+				}, 400);
+			});
+		} // [2]
+
+		function openCreateDepartmentModal() {
+			const modal = mountModal('#dept-modal-root', {
+				title: 'Create department',
+				contentHtml: '',
+				size: 'md',
+				closeOnEsc: true,
+				closeOnBackdrop: true,
+				showCloseButton: true,
+			}); // [6]
+			const content = document.createElement('div');
+			content.className = 'flex flex-col gap-4';
+			content.innerHTML = `
+<div id="field-name"></div>
+<div id="field-desc"></div>
+`;
+			modal.setContent(content); // [6]
+
+			const nameField = mountTextField('#field-name', {
+				type: 'text',
+				label: 'Department name',
+				placeholder: 'e.g. Field Services',
+				value: '',
+				clearErrorOnInput: true,
+			}); // [3]
+			const descField = mountTextField('#field-desc', {
+				type: 'text',
+				label: 'Description (optional)',
+				placeholder: 'Short description',
+				value: '',
+				clearErrorOnInput: true,
+			}); // [3]
+
+			modal.setPrimaryAction({
+				label: 'Create',
+				onClick: async (_, api) => {
+					const name = nameField.getValue().trim();
+					const desc = descField.getValue().trim();
+					let ok = true;
+					if (name.length < 2) {
+						nameField.setError('Name must be at least 2 characters'); // [3]
+						ok = false;
+					}
+					if (!ok) return;
+
+					await withLoader('Creating department...', 'Applying changes', async () => {
+						const id = generateDeptId();
+						const now = new Date().toISOString();
+						DEPARTMENTS.push({
+							id,
+							name,
+							description: desc || '',
+							jobTitleIds: [],
+							createdAt: now,
+							updatedAt: now,
+						});
+						render();
+					});
+					api.close(); // [6]
+					modal.destroy(); // [6]
+				}
+			});
+			modal.setSecondaryAction({
+				label: 'Cancel',
+				onClick: (_, api) => { api.close(); modal.destroy(); }
+			}); // [6]
+			modal.open(); // [6]
+		}
+
+		function openEditDepartmentModal(deptId) {
+			const dept = DEPARTMENTS.find(d => d.id === deptId);
+			if (!dept) return;
+
+			const modal = mountModal('#dept-modal-root', {
+				title: `Edit: ${escapeHtml(dept.name)}`,
+				contentHtml: '',
+				size: 'md',
+				closeOnEsc: true,
+				closeOnBackdrop: true,
+				showCloseButton: true,
+			}); // [6]
+			const content = document.createElement('div');
+			content.className = 'flex flex-col gap-4';
+			content.innerHTML = `
+<div id="field-name"></div>
+<div id="field-desc"></div>
+`;
+			modal.setContent(content); // [6]
+
+			const nameField = mountTextField('#field-name', {
+				type: 'text',
+				label: 'Department name',
+				placeholder: 'Name',
+				value: dept.name,
+				clearErrorOnInput: true,
+			}); // [3]
+			const descField = mountTextField('#field-desc', {
+				type: 'text',
+				label: 'Description (optional)',
+				placeholder: 'Description',
+				value: dept.description || '',
+				clearErrorOnInput: true,
+			}); // [3]
+
+			modal.setPrimaryAction({
+				label: 'Save changes',
+				onClick: async (_, api) => {
+					const name = nameField.getValue().trim();
+					const desc = descField.getValue().trim();
+					let ok = true;
+					if (name.length < 2) {
+						nameField.setError('Name must be at least 2 characters'); // [3]
+						ok = false;
+					}
+					if (!ok) return;
+
+					await withLoader('Saving changes...', 'Updating records', async () => {
+						const idx = DEPARTMENTS.findIndex(d => d.id === deptId);
+						if (idx >= 0) {
+							DEPARTMENTS[idx] = {
+								...DEPARTMENTS[idx],
+								name,
+								description: desc || '',
+								updatedAt: new Date().toISOString(),
+							};
+						}
+						render();
+					});
+					api.close(); // [6]
+					modal.destroy(); // [6]
+				}
+			});
+			modal.setSecondaryAction({
+				label: 'Cancel',
+				onClick: (_, api) => { api.close(); modal.destroy(); }
+			}); // [6]
+			modal.open(); // [6]
+		}
+
+		function openManageTitlesModal(deptId) {
+			const dept = DEPARTMENTS.find(d => d.id === deptId);
+			if (!dept) return;
+
+			const modal = mountModal('#dept-modal-root', {
+				title: `Manage job titles: ${escapeHtml(dept.name)}`,
+				contentHtml: '',
+				size: 'md',
+				closeOnEsc: true,
+				closeOnBackdrop: true,
+				showCloseButton: true,
+			}); // [6]
+
+			const content = document.createElement('div');
+			content.className = 'flex flex-col gap-4';
+			content.innerHTML = `
+<div>
+	<div id="titles-select"></div>
+	<p class="text-xs text-neutral-500 mt-2">Select all job titles that should belong to this department.</p>
+</div>
+`;
+			modal.setContent(content); // [6]
+
+			const titlesSelect = mountSelectField('#titles-select', allJobTitleItems(), {
+				label: 'Job titles',
+				placeholder: 'Search and select job titles...',
+			}); // [1]
+			titlesSelect.setChosen(dept.jobTitleIds.slice()); // prefill [1]
+
+			modal.setPrimaryAction({
+				label: 'Save',
+				onClick: async (_, api) => {
+					const chosen = titlesSelect.getChosen(); // [1]
+					await withLoader('Saving connections...', 'Applying mapping to department', async () => {
+						const idx = DEPARTMENTS.findIndex(d => d.id === deptId);
+						if (idx >= 0) {
+							DEPARTMENTS[idx] = {
+								...DEPARTMENTS[idx],
+								jobTitleIds: chosen,
+								updatedAt: new Date().toISOString(),
+							};
+						}
+						render();
+					});
+					api.close(); // [6]
+					modal.destroy(); // [6]
+				}
+			});
+			modal.setSecondaryAction({
+				label: 'Cancel',
+				onClick: (_, api) => { api.close(); modal.destroy(); }
+			}); // [6]
+			modal.open(); // [6]
+		}
+
+		function confirmDeleteDepartment(deptId) {
+			const dept = DEPARTMENTS.find(d => d.id === deptId);
+			if (!dept) return;
+
+			const modal = mountModal('#dept-modal-root', {
+				title: 'Delete department?',
+				contentHtml: `<p class="text-neutral-300">Are you sure you want to delete <strong>${escapeHtml(dept.name)}</strong>? This action cannot be undone.</p>`,
+				size: 'sm',
+				closeOnEsc: true,
+				closeOnBackdrop: true,
+				showCloseButton: true,
+				primaryAction: {
+					label: 'Delete',
+					onClick: async (_, api) => {
+						await withLoader('Deleting department...', '', async () => {
+							DEPARTMENTS = DEPARTMENTS.filter(d => d.id !== deptId);
+							render();
+						});
+						api.close(); // [6]
+						modal.destroy(); // [6]
+					}
+				},
+				secondaryAction: {
+					label: 'Cancel',
+					onClick: (_, api) => { api.close(); modal.destroy(); }
+				}
+			}); // [6]
+			modal.open(); // [6]
+		}
+
+		function generateDeptId() {
+			const nums = DEPARTMENTS.map(d => parseInt(String(d.id).split('-')[1], 10)).filter(n => !isNaN(n));
+			const next = (nums.length ? Math.max(...nums) : 1000) + 1;
+			return `D-${next}`;
+		}
+
+		// Simulate a job titles synchronization event.
+		// New, previously unconnected titles must appear indistinguishably among options.
+		async function simulateJobTitlesSync() {
+			await withLoader('Syncing job titles...', 'Fetching from external service', async () => {
+				// Example: Add two new titles (not connected yet)
+				const newOnes = [
+					{ id: 'JT-1010', name: 'Cloud Support Engineer' },
+					{ id: 'JT-1011', name: 'Endpoint Management Specialist' },
+				];
+				// Merge by id
+				const byId = new Map(JOB_TITLES_SYNCED.map(j => [j.id, j]));
+				for (const jt of newOnes) byId.set(jt.id, jt);
+				JOB_TITLES_SYNCED = Array.from(byId.values());
+				refreshJobTitleFilterOptions(); // keep current selections while updating options [1]
+				// Note: In "Manage titles" modal, options are read when opening.
+			});
+		}
+
+		// Refresh job title filter options while preserving current selection.
+		function refreshJobTitleFilterOptions() {
+			const selected = jobTitleFilter.getChosen(); // [1]
+			const items = allJobTitleItems();
+			// setItems clears selection by design -> re-apply afterwards. [1]
+			jobTitleFilter.setItems(items); // [1]
+			// Restore only those still valid
+			const validSet = new Set(items.map(i => i.value));
+			const restored = selected.filter(v => validSet.has(v));
+			if (restored.length) jobTitleFilter.setChosen(restored); // [1]
+		}
+
+		// Initial render
+		render();
+		</script>
 	</body>
 </html>

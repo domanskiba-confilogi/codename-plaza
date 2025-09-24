@@ -7,11 +7,16 @@
 		<link rel="stylesheet" href="/tailwind.css">
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
 		<div id="loading-screen"></div>
+
+		<!-- Navbar -->
 		<div id="navbar-root"></div>
 
+
 		<!-- Main -->
-		<main class="flex-1 hidden" data-unhide="true">
+		<main class="flex-1">
 			<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
 				<!-- Page header -->
 				<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
@@ -39,7 +44,7 @@
 						<p class="mt-2 text-sm text-neutral-400">Account deactivation and return of equipment.</p>
 					</a>
 
-					<a href="" id="hardware-replacement-link" class="group block bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 hover:bg-neutral-900 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" aria-label="Replacement of computer equipment">
+					<a href="/report-problem/hardware-replacement.html" class="group block bg-neutral-900/60 ring-1 ring-neutral-800 rounded-2xl p-4 sm:p-5 hover:bg-neutral-900 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" aria-label="Replacement of computer equipment">
 						<div class="flex items-start justify-between gap-3">
 							<h2 class="text-base sm:text-lg font-semibold leading-snug">Replacement of computer equipment</h2>
 							<span class="text-sm text-blue-400 group-hover:text-blue-300">→</span>
@@ -90,8 +95,37 @@
 			</section>
 		</main>
 
-		<div id="error-modal-root"></div>
+		<script src="./main.js"></script>
+		<script src="./components/navbar/main.js"></script>
+		<script src="./components/text_field/main.js"></script>
+		<script src="./components/select_field/main.js"></script>
+		<script src="./components/modal/main.js"></script>
+		<script src="./components/button/main.js"></script>
+		<script src="./components/suspense_screen/main.js"></script>
+		<script>
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
 
-		<script type="module" src="/dist/page_report_problem.js"></script>
+		(async () => {
+			try {
+				const apiConnector = createApiConnector();
+				const authStore = createAuthStore();
+
+				await checkIsLoggedInMiddleware(authStore);
+
+				loadingScreen.destroy();
+
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
+		</script>
 	</body>
 </html>

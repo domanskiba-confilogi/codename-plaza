@@ -7,6 +7,7 @@
 		<link rel="stylesheet" href="/tailwind.css">
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
 		<div id="loading-screen-root"></div>
 		<!-- Navbar -->
 		<div id="navbar-root"></div>
@@ -32,7 +33,12 @@
 			</div>
 		</main>
 
-		<div id="error-modal-root"></div>
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
 
 		<script>
 		const authStore = createAuthStore();

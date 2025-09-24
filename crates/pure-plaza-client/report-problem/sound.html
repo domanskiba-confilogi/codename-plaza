@@ -7,6 +7,8 @@
 		<link rel="stylesheet" href="/tailwind.css">
 	</head>
 	<body class="bg-neutral-950 text-neutral-200 min-h-screen flex flex-col">
+		<div id="error-modal-root"></div>
+
 		<div id="loading-screen"></div>
 
 		<!-- Navbar -->
@@ -73,8 +75,151 @@
 			</section>
 		</main>
 
-		<div id="error-modal-root"></div>
+		<script src="/main.js"></script>
+		<script src="/components/navbar/main.js"></script>
+		<script src="/components/text_field/main.js"></script>
+		<script src="/components/select_field/main.js"></script>
+		<script src="/components/modal/main.js"></script>
+		<script src="/components/button/main.js"></script>
+		<script src="/components/checkbox_field/main.js"></script>
+		<script src="/components/suspense_screen/main.js"></script>
+		<script src="/components/textarea_field/main.js"></script>
 
-		<script type="module" src="/dist/page_report_sound.js"></script>
+		<script>
+		const authStore = createAuthStore();
+
+		const loadingScreen = mountSuspenseScreen("#loading-screen", {
+			message: "Loading needed data...",
+		});
+
+		const apiConnector = createApiConnector();
+
+		(async () => {
+			try {
+				await checkIsLoggedInMiddleware(authStore);
+
+				loadingScreen.destroy();
+
+				Array.from(document.querySelectorAll('[data-loading="show"]')).forEach(element => {
+					element.classList.remove("hidden");
+				});
+
+				// Navbar
+				const navbar = mountNavbar('#navbar-root', {
+					brandHref: '/',
+					brandName: 'Confilogi',
+					brandAccent: 'IT Support',
+					...LOGGED_IN_NAVBAR_ARGS
+				});
+
+				const fields = {
+					firstNameField: mountTextField('#first-name-field', {
+						label: 'Name',
+						type: 'text',
+						placeholder: 'Enter name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					secondNameField: mountTextField('#second-name-field', {
+						label: 'Second name (optional)',
+						type: 'text',
+						placeholder: 'Enter second name...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					lastNameField: mountTextField('#last-name-field', {
+						label: 'Surname',
+						type: 'text',
+						placeholder: 'Enter surname...',
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					anydeskField: mountTextField("#anydesk-field", {
+						type: 'text',
+						label: "Anydesk number",
+						placeholder: "e.g., 1 234 567 890",
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					computerIdField: mountTextField("#computer-id-field", {
+						type: 'text',
+						label: `Computer's id`,
+						placeholder: "e.g, CONFI-000000000",
+						value: '',
+						clearErrorOnInput: true,
+					}),
+					descriptionField: mountTextArea("#description-field", {
+						label: "Description of the problem",
+						placeholder: "Tell us about your problem...",
+						value: '',
+						clearErrorOnInput: true,
+					}),
+				};
+
+				mountButton("#shortcut-1", {
+					label: "I hear the customers, they don't hear me.",
+					variant: 'secondary',
+					size: 'sm',
+					onClick: () => {
+						fields.descriptionField.setValue("Hello, the person that contact's data is provided inside the ticket can hear the customers, but they don't hear the agent.");
+					}
+				});
+
+				mountButton("#shortcut-2", {
+					label: "I don't hear the customers.",
+					variant: 'secondary',
+					size: 'sm',
+					onClick: () => {
+						fields.descriptionField.setValue("Hello, the person that contact's data is provided inside the ticket can't hear the customers.");
+					}
+				});
+
+				const cancelBtn = mountButton('#cancel-btn', {
+					label: 'Cancel',
+					variant: 'ghost',
+					size: 'sm',
+					onClick: () => {
+						window.location.href = '/report-problem.html';
+					}
+				});
+
+				const submitBtn = mountButton('#submit-btn', {
+					label: 'Submit',
+					variant: 'primary',
+					size: 'md',
+					type: 'button',
+					onClick: () => {
+						submitOnboarding();
+					}
+				});
+
+				// Validation helpers
+				function clearAllErrors() {
+					Object.values(fields).forEach(f => f.clearError());
+				}
+
+				async function submitOnboarding() {
+					clearAllErrors();
+
+					// Gather
+					const payload = {
+						person: {
+							name: fields.firstNameField.getValue().trim(),
+							secondName: fields.secondNameField.getValue().trim(),
+							surname: fields.lastNameField.getValue().trim(),
+						},
+						computerId: fields.computerIdField.getValue().trim(),
+						anydeskNumber: fields.anydeskField.getValue().trim(),
+						description: fields.descriptionField.getValue().trim(),
+					};
+
+					console.log(payload);
+				}
+			} catch (error) {
+				reportCriticalError(error);
+			}
+		})();
+
+		</script>
 	</body>
 </html>

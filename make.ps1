@@ -20,6 +20,9 @@ if ($Command -eq "watch-backend") {
 } elseif ($Command -eq "reset-database") {
 	Set-Location $BackEndPath;
 	cargo sqlx database reset;
+} elseif ($Command -eq "watch-frontend") {
+	Set-Location $FrontEndPath;
+	watchexec -c -r -e ts -- "npx tsc"
 } else {
-	Write-Host "Available commands: 'watch-backend', 'watch-frontend-css', 'reset-database'"
+	Write-Host "Available commands: 'watch-backend', 'watch-frontend-css', 'reset-database', 'watch-frontend'"
 }
